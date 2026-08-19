@@ -2,32 +2,45 @@ import SwiftUI
 import UserNotifications
 
 struct ScheduleStep: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(NotificationManager.self) private var notificationManager
     @Bindable var draft: MedicineDraft
+    @Binding var validationMessage: String?
 
     @State private var expandedTime: Int?
+    @AccessibilityFocusState private var validationIsFocused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                Text(draft.contextLine)
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(AppTheme.title)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    Text(draft.contextLine)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(AppTheme.title)
 
-                daysSection
-                timesSection
-                reminderToggle
-
-                if !draft.scheduleIsValid {
-                    Label(
-                        "Choose at least one day and one time, or leave both empty for as-needed.",
-                        systemImage: "info.circle"
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.secondaryText)
+                    validationCard
+                    daysSection
+                    timesSection
+                    reminderToggle
+                }
+                .padding(20)
+            }
+            .onChange(of: draft.daysOfWeek) {
+                refreshValidationMessage()
+            }
+            .onChange(of: draft.times) {
+                refreshValidationMessage()
+            }
+            .onChange(of: validationMessage) { _, message in
+                validationIsFocused = message != nil
+                guard message != nil else { return }
+                Task { @MainActor in
+                    await Task.yield()
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.25)) {
+                        proxy.scrollTo("schedule-validation", anchor: .top)
+                    }
                 }
             }
-            .padding(20)
         }
     }
 
@@ -50,6 +63,40 @@ struct ScheduleStep: View {
 
             DayCircles(selectedDays: draft.daysOfWeek) { day in
                 draft.toggleDay(day)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    draft.toggleAllDays()
+                } label: {
+                    Label(
+                        draft.daysOfWeek == Set(1...7) ? "Clear days" : "Select all days",
+                        systemImage: draft.daysOfWeek == Set(1...7)
+                            ? "xmark.circle"
+                            : "checkmark.circle"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(AppTheme.blueFill)
+                    .clipShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("schedule.all-days")
+
+                Button {
+                    draft.clearSchedule()
+                } label: {
+                    Text("As needed")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(AppTheme.surface)
+                        .clipShape(.capsule)
+                        .overlay {
+                            Capsule().stroke(AppTheme.divider)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("schedule.as-needed")
             }
         }
         .medicationCard()
@@ -138,8 +185,58 @@ struct ScheduleStep: View {
                     .clipShape(.capsule)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("schedule.add-time")
         }
         .medicationCard()
+    }
+
+    @ViewBuilder
+    private var validationCard: some View {
+        if let validationMessage {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(validationMessage, systemImage: "exclamationmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.red)
+                    .accessibilityFocused($validationIsFocused)
+
+                if !draft.daysOfWeek.isEmpty && draft.times.isEmpty {
+                    Button("Add 8:00 a.m.", systemImage: "clock.badge.plus") {
+                        draft.addTime()
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .minimumTapTarget()
+                } else if draft.daysOfWeek.isEmpty && !draft.times.isEmpty {
+                    Button("Select all days", systemImage: "checkmark.circle") {
+                        draft.toggleAllDays()
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .minimumTapTarget()
+                }
+
+                Button("Use as needed instead") {
+                    draft.clearSchedule()
+                }
+                .font(.subheadline.weight(.semibold))
+                .minimumTapTarget()
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppTheme.redFill)
+            .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
+            .accessibilityIdentifier("schedule.validation")
+            .id("schedule-validation")
+        }
+    }
+
+    private func refreshValidationMessage() {
+        guard validationMessage != nil else { return }
+        if draft.scheduleIsValid {
+            validationMessage = nil
+        } else {
+            validationMessage = draft.daysOfWeek.isEmpty
+                ? "Choose at least one day for the times you added."
+                : "Add at least one time for the selected days."
+        }
     }
 
     private var reminderToggle: some View {

@@ -11,6 +11,8 @@ struct MedicationDetailView: View {
     var onRestart: (() -> Void)?
 
     @State private var showingEdit = false
+    @State private var showingScriptEditor = false
+    @State private var selectedScript: RefillScript?
     @State private var pendingAction: MedicationDetailAction?
 
     var body: some View {
@@ -32,9 +34,15 @@ struct MedicationDetailView: View {
 
                     duration
 
+                    if let expiryDate = medicine.packageExpiryDate {
+                        packageExpiry(expiryDate)
+                    }
+
                     if let quantity = medicine.quantityRemaining {
                         quantityRemaining(quantity)
                     }
+
+                    refillScripts
 
                     if isReadOnly, let onRestart {
                         FooterActionButton(
@@ -54,6 +62,16 @@ struct MedicationDetailView: View {
         .background(AppTheme.background)
         .sheet(isPresented: $showingEdit) {
             MedicineWizardView(medicine: medicine)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+        }
+        .sheet(isPresented: $showingScriptEditor) {
+            RefillScriptEditorView(medicine: medicine)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+        }
+        .sheet(item: $selectedScript) { script in
+            RefillScriptReviewView(script: script, allowsEditing: !isReadOnly)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
         }
@@ -133,6 +151,92 @@ struct MedicationDetailView: View {
                 }
             }
             .font(.headline)
+        }
+    }
+
+    private func packageExpiry(_ date: Date) -> some View {
+        DetailLabelRow("Package expiry", symbol: "calendar.badge.clock") {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(date.longMedicationDate)
+                    .font(.headline)
+                if date.startOfDay < Date.now.startOfDay {
+                    Label("Expired", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.red)
+                }
+            }
+        }
+    }
+
+    private var refillScripts: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeading(title: "Refill Scripts")
+
+            if sortedScripts.isEmpty {
+                Text("No refill scripts recorded")
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .frame(maxWidth: .infinity, minHeight: 64)
+                    .medicationCard()
+            } else {
+                ForEach(sortedScripts) { script in
+                    Button {
+                        selectedScript = script
+                    } label: {
+                        HStack(spacing: 12) {
+                            CircularSymbol(
+                                name: script.status == .valid
+                                    ? "checkmark.seal"
+                                    : "doc.text.magnifyingglass"
+                            )
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(script.status.title)
+                                    .font(.headline)
+                                    .foregroundStyle(AppTheme.title)
+                                Text("\(script.repeatsRemaining) repeats remaining")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppTheme.secondaryText)
+                                if let expiryDate = script.expiryDate {
+                                    Text("Expires \(expiryDate.shortMedicationDate)")
+                                        .font(.caption)
+                                        .foregroundStyle(AppTheme.secondaryText)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(AppTheme.blue)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .medicationCard()
+                    .accessibilityHint("Opens refill script review")
+                    .accessibilityIdentifier(
+                        "refill.script.\(script.scriptNumber ?? script.id.uuidString)"
+                    )
+                }
+            }
+
+            if !isReadOnly {
+                Button {
+                    showingScriptEditor = true
+                } label: {
+                    Label("Add refill script", systemImage: "doc.badge.plus")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.blue)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(AppTheme.blueFill)
+                        .clipShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("refill.add")
+            }
+        }
+    }
+
+    private var sortedScripts: [RefillScript] {
+        medicine.refillScripts.sorted {
+            ($0.expiryDate ?? .distantPast) > ($1.expiryDate ?? .distantPast)
         }
     }
 

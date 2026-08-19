@@ -54,6 +54,7 @@ struct MedicationsCatalogView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityHint("Opens medication details")
+                            .accessibilityIdentifier("medicine.row.\(medicine.name)")
 
                             if medicine.id != individualMedicines.last?.id {
                                 Divider()
@@ -195,6 +196,7 @@ struct MedicationsCatalogView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Opens medication details")
+                    .accessibilityIdentifier("medicine.row.\(medicine.name)")
                 }
             }
         }

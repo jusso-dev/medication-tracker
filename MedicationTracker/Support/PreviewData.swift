@@ -20,6 +20,11 @@ enum PreviewData {
             month: 8,
             day: 25
         )) ?? .now
+        let scriptExpiry = calendar.date(from: DateComponents(
+            year: 2027,
+            month: 8,
+            day: 25
+        )) ?? .now
 
         let ibuprofen = Medicine(
             name: "Ibuprofen",
@@ -40,7 +45,17 @@ enum PreviewData {
             intervalLinked: true,
             startDate: start,
             endDate: end,
-            remindersOn: true
+            remindersOn: true,
+            packageExpiryDate: scriptExpiry
+        )
+        let refillScript = RefillScript(
+            medicine: amoxicillin,
+            scriptNumber: "RX-12345",
+            expiryDate: scriptExpiry,
+            repeatsAuthorised: 5,
+            repeatsRemaining: 3,
+            prescriber: "Dr. Chen",
+            lastReviewedAt: start
         )
         let plan = TreatmentPlan(
             title: "Tooth Infection",
@@ -50,6 +65,7 @@ enum PreviewData {
         ibuprofen.plan = plan
         amoxicillin.plan = plan
         container.mainContext.insert(plan)
+        container.mainContext.insert(refillScript)
         try? container.mainContext.save()
         return container
     }
@@ -61,6 +77,7 @@ enum PreviewData {
                 for: Medicine.self,
                 TreatmentPlan.self,
                 DoseEvent.self,
+                RefillScript.self,
                 configurations: configuration
             )
         } catch {

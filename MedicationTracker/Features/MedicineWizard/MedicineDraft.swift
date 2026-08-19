@@ -19,6 +19,8 @@ final class MedicineDraft {
     var durationUnit: DurationUnit = .days
     var durationValue = 0
     var notes = ""
+    var packageExpiryDate: Date?
+    var packageExpiryEnabled = false
     var dailyCapText = ""
     var quantityText = ""
     var refillAtText = "5"
@@ -74,6 +76,8 @@ final class MedicineDraft {
         endDate = medicine.endDate
         isOngoing = medicine.endDate == nil
         notes = medicine.notes ?? ""
+        packageExpiryDate = medicine.packageExpiryDate
+        packageExpiryEnabled = medicine.packageExpiryDate != nil
         dailyCapText = medicine.dailyCap.map(String.init) ?? ""
         quantityText = medicine.quantityRemaining?.medicationFormatted ?? ""
         refillAtText = medicine.refillAt?.medicationFormatted ?? "5"
@@ -95,6 +99,21 @@ final class MedicineDraft {
             daysOfWeek.insert(day)
         }
         updateDayPresetLabel()
+    }
+
+    func toggleAllDays() {
+        daysOfWeek = daysOfWeek == Set(1...7) ? [] : Set(1...7)
+        updateDayPresetLabel()
+    }
+
+    func clearSchedule() {
+        daysOfWeek = []
+        times = []
+        intervalMinutes = nil
+        intervalLinked = false
+        remindersOn = false
+        dayPreset = nil
+        timePreset = nil
     }
 
     func cycleDayPreset() {
@@ -185,6 +204,22 @@ final class MedicineDraft {
         endDate = nil
     }
 
+    func applyScan(_ result: MedicationScanResult) {
+        if let medicineName = result.medicineName {
+            name = medicineName
+        }
+        if let amount = result.amount {
+            amountText = amount.medicationFormatted
+        }
+        if let unit = result.unit {
+            self.unit = unit
+        }
+        if let expiryDate = result.expiryDate {
+            packageExpiryDate = expiryDate
+            packageExpiryEnabled = true
+        }
+    }
+
     func save(context: ModelContext, plan: TreatmentPlan? = nil) throws -> Medicine {
         guard let amount = parsedAmount, amount > 0 else {
             throw MedicineDraftError.invalidAmount
@@ -211,6 +246,9 @@ final class MedicineDraft {
             target.endDate = isOngoing ? nil : endDate?.startOfDay
             target.remindersOn = remindersOn && !isAsNeeded
             target.notes = notes.nilIfBlank
+            target.packageExpiryDate = packageExpiryEnabled
+                ? packageExpiryDate?.startOfDay
+                : nil
             target.dailyCap = dailyCap
             target.quantityRemaining = quantity
             target.refillAt = refill
@@ -231,6 +269,7 @@ final class MedicineDraft {
                 endDate: isOngoing ? nil : endDate,
                 remindersOn: remindersOn && !isAsNeeded,
                 notes: notes,
+                packageExpiryDate: packageExpiryEnabled ? packageExpiryDate : nil,
                 dailyCap: dailyCap,
                 quantityRemaining: quantity,
                 refillAt: refill,

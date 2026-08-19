@@ -6,8 +6,10 @@ final class TreatmentPlan {
     @Attribute(.unique) var id: UUID
     var title: String
     var prescriber: String?
-    var startDate: Date?
-    var endDate: Date?
+    @Attribute(originalName: "startDate") var legacyStartDate: Date?
+    @Attribute(originalName: "endDate") var legacyEndDate: Date?
+    var startDay: CalendarDay?
+    var endDay: CalendarDay?
     var statusRawValue: String
     var completedAt: Date?
     @Relationship(deleteRule: .nullify) var medicines: [Medicine]
@@ -15,6 +17,22 @@ final class TreatmentPlan {
     var status: TreatmentPlanStatus {
         get { TreatmentPlanStatus(rawValue: statusRawValue) ?? .active }
         set { statusRawValue = newValue.rawValue }
+    }
+
+    var startDate: Date? {
+        get { startDay?.date() ?? legacyStartDate }
+        set {
+            startDay = newValue.map { CalendarDay($0) }
+            legacyStartDate = nil
+        }
+    }
+
+    var endDate: Date? {
+        get { endDay?.date() ?? legacyEndDate }
+        set {
+            endDay = newValue.map { CalendarDay($0) }
+            legacyEndDate = nil
+        }
     }
 
     var prescriberDisplayName: String {
@@ -37,6 +55,10 @@ final class TreatmentPlan {
         self.id = id
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.prescriber = prescriber?.nilIfBlank
+        self.legacyStartDate = nil
+        self.legacyEndDate = nil
+        self.startDay = nil
+        self.endDay = nil
         self.statusRawValue = status.rawValue
         self.medicines = medicines
         updateDates()
@@ -48,5 +70,16 @@ final class TreatmentPlan {
         endDate = active.contains(where: { $0.endDate == nil })
             ? nil
             : active.compactMap(\.endDate).max()
+    }
+
+    func migrateCalendarDaysIfNeeded() {
+        if startDay == nil, let legacyStartDate {
+            startDay = CalendarDay(legacyStartDate)
+            self.legacyStartDate = nil
+        }
+        if endDay == nil, let legacyEndDate {
+            endDay = CalendarDay(legacyEndDate)
+            self.legacyEndDate = nil
+        }
     }
 }

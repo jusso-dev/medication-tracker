@@ -11,6 +11,7 @@ struct SettingsView: View {
 
     @AppStorage(SettingsKeys.reminderLeadTime) private var reminderLeadTime = 0
     @AppStorage(SettingsKeys.snoozeMinutes) private var snoozeMinutes = 10
+    @State private var showingCareShare = false
 
     var body: some View {
         ScrollView {
@@ -23,13 +24,15 @@ struct SettingsView: View {
 
                 notificationSection
                 scheduleSection
+                careShareSection
                 privacySection
                 aboutSection
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
-            .padding(.bottom, 28)
+            .padding(.bottom, 120)
         }
+        .scrollIndicators(.visible)
         .background(AppTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .task {
@@ -47,6 +50,16 @@ struct SettingsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(appLock.errorMessage ?? "")
+        }
+        .sheet(isPresented: $showingCareShare) {
+            CareShareView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+        }
+        .onChange(of: appLock.isUnlocked) { _, isUnlocked in
+            if !isUnlocked {
+                showingCareShare = false
+            }
         }
     }
 
@@ -109,6 +122,31 @@ struct SettingsView: View {
             Text("Uses Face ID or the device passcode. Off by default.")
                 .font(.footnote)
                 .foregroundStyle(AppTheme.secondaryText)
+        }
+        .medicationCard()
+    }
+
+    private var careShareSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeading(title: "Care sharing")
+            Label("Share with a partner or loved one", systemImage: "person.2.fill")
+                .font(.headline)
+                .foregroundStyle(AppTheme.title)
+            Text("Create a one-time snapshot and send it with the secure system AirDrop flow.")
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.secondaryText)
+            Button {
+                showingCareShare = true
+            } label: {
+                Label("Open Care Share", systemImage: "airdrop")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(AppTheme.blue)
+                    .clipShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("care-share.settings")
         }
         .medicationCard()
     }

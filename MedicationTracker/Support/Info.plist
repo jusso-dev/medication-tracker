@@ -20,10 +20,52 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Medication Care Snapshot</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>dev.jusso.medicationtracker.care-snapshot</string>
+            </array>
+        </dict>
+    </array>
     <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
     <true/>
     <key>NSFaceIDUsageDescription</key>
     <string>Use Face ID to keep your medication log private.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Scan medicine labels and prescriptions to prefill details for your review.</string>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.json</string>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeDescription</key>
+            <string>Medication Care Snapshot</string>
+            <key>UTTypeIdentifier</key>
+            <string>dev.jusso.medicationtracker.care-snapshot</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>medcare</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/vnd.jusso.medication-care+json</string>
+            </dict>
+        </dict>
+    </array>
     <key>UILaunchScreen</key>
     <dict>
         <key>UIColorName</key>

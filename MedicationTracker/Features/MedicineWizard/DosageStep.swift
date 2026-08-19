@@ -19,6 +19,7 @@ struct DosageStep: View {
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(draft.hasValidAmount ? AppTheme.blue : AppTheme.secondaryText)
                         .accessibilityLabel("Dose \(amountSummary)")
+                        .accessibilityIdentifier("dose.amount")
                 }
 
                 unitTabs
@@ -42,6 +43,15 @@ struct DosageStep: View {
         .onChange(of: draft.amountText) {
             if draft.hasValidAmount {
                 showAmountTooltip = false
+            }
+        }
+        .onChange(of: draft.packageExpiryEnabled) { _, enabled in
+            if enabled && draft.packageExpiryDate == nil {
+                draft.packageExpiryDate = Calendar.current.date(
+                    byAdding: .year,
+                    value: 1,
+                    to: .now
+                )?.startOfDay
             }
         }
     }
@@ -118,6 +128,21 @@ struct DosageStep: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Delete last digit")
             }
+
+            Button {
+                draft.amountText = ""
+                showAmountTooltip = false
+            } label: {
+                Label("Clear dose", systemImage: "eraser")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.red)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(AppTheme.redFill)
+                    .clipShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .disabled(draft.amountText.isEmpty)
+            .accessibilityIdentifier("dose.clear")
         }
     }
 
@@ -127,6 +152,28 @@ struct DosageStep: View {
                 TextField("Notes / take-with (optional)", text: $draft.notes, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityHint("For example, With food or Before bed")
+
+                Toggle("Track package expiry", isOn: $draft.packageExpiryEnabled)
+                    .tint(AppTheme.blue)
+
+                if draft.packageExpiryEnabled {
+                    DatePicker(
+                        "Package expiry",
+                        selection: Binding(
+                            get: {
+                                draft.packageExpiryDate
+                                    ?? Calendar.current.date(
+                                        byAdding: .year,
+                                        value: 1,
+                                        to: .now
+                                    )
+                                    ?? .now
+                            },
+                            set: { draft.packageExpiryDate = $0.startOfDay }
+                        ),
+                        displayedComponents: .date
+                    )
+                }
 
                 TextField("As-needed daily cap (optional)", text: $draft.dailyCapText)
                     .keyboardType(.numberPad)

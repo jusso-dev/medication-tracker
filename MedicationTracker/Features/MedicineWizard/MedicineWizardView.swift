@@ -15,6 +15,7 @@ struct MedicineWizardView: View {
     @State private var step = 0
     @State private var movingForward = true
     @State private var showAmountTooltip = false
+    @State private var scheduleValidationMessage: String?
     @State private var saveError: String?
 
     private let titles = [
@@ -72,7 +73,10 @@ struct MedicineWizardView: View {
         case 1:
             DosageStep(draft: draft, showAmountTooltip: $showAmountTooltip)
         case 2:
-            ScheduleStep(draft: draft)
+            ScheduleStep(
+                draft: draft,
+                validationMessage: $scheduleValidationMessage
+            )
         default:
             DurationStep(draft: draft)
         }
@@ -104,6 +108,7 @@ struct MedicineWizardView: View {
             return
         }
         movingForward = false
+        scheduleValidationMessage = nil
         step -= 1
     }
 
@@ -111,12 +116,17 @@ struct MedicineWizardView: View {
         guard canContinue else {
             if step == 1 {
                 showAmountTooltip = true
+            } else if step == 2 {
+                scheduleValidationMessage = draft.daysOfWeek.isEmpty
+                    ? "Choose at least one day for the times you added."
+                    : "Add at least one time for the selected days."
             }
             return
         }
 
         guard step == titles.count - 1 else {
             movingForward = true
+            scheduleValidationMessage = nil
             step += 1
             return
         }

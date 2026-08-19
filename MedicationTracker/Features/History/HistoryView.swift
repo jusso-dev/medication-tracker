@@ -37,6 +37,7 @@ struct HistoryView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityHint("Opens read-only medication details")
+                                .accessibilityIdentifier("history.row.\(medicine.name)")
 
                                 if medicine.id != group.medicines.last?.id {
                                     Divider()
@@ -150,6 +151,7 @@ struct HistoryView: View {
             endDate: newEnd,
             remindersOn: medicine.remindersOn,
             notes: medicine.notes,
+            packageExpiryDate: medicine.packageExpiryDate,
             dailyCap: medicine.dailyCap,
             quantityRemaining: medicine.quantityRemaining,
             refillAt: medicine.refillAt

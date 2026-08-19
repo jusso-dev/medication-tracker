@@ -8,6 +8,7 @@ struct MedicationTrackerApp: App {
     @State private var router = AppRouter.shared
     @State private var notificationManager = NotificationManager.shared
     @State private var appLock = AppLockService()
+    @State private var careShareImportRouter = CareShareImportRouter.shared
 
     private let modelContainer: ModelContainer
     private let storeError: String?
@@ -25,13 +26,15 @@ struct MedicationTrackerApp: App {
                     for: Medicine.self,
                     TreatmentPlan.self,
                     DoseEvent.self,
+                    RefillScript.self,
                     configurations: configuration
                 )
             } else {
                 resolvedContainer = try ModelContainer(
                     for: Medicine.self,
                     TreatmentPlan.self,
-                    DoseEvent.self
+                    DoseEvent.self,
+                    RefillScript.self
                 )
             }
         } catch {
@@ -42,14 +45,31 @@ struct MedicationTrackerApp: App {
                     for: Medicine.self,
                     TreatmentPlan.self,
                     DoseEvent.self,
+                    RefillScript.self,
                     configurations: configuration
                 )
             } catch {
                 fatalError("Unable to create the medication store: \(error)")
             }
         }
+        if launchError == nil {
+            do {
+                try CalendarDayMigration.migrateIfNeeded(
+                    context: resolvedContainer.mainContext
+                )
+            } catch {
+                launchError = error.localizedDescription
+            }
+        }
         modelContainer = resolvedContainer
         storeError = launchError
+
+        if isTesting && ProcessInfo.processInfo.arguments.contains("--ui-testing-seed") {
+            try? UITestSeeder.seed(context: modelContainer.mainContext)
+        }
+        if isTesting && ProcessInfo.processInfo.arguments.contains("--ui-testing-import") {
+            CareShareImportRouter.shared.pendingPackage = UITestSeeder.importPackage()
+        }
 
         if UserDefaults.standard.object(forKey: SettingsKeys.snoozeMinutes) == nil {
             UserDefaults.standard.set(10, forKey: SettingsKeys.snoozeMinutes)
@@ -103,8 +123,47 @@ struct MedicationTrackerApp: App {
                     break
                 }
             }
+            .onOpenURL { url in
+                careShareImportRouter.open(url)
+            }
+            .sheet(item: pendingCareShareImport) { package in
+                CareShareImportView(
+                    package: package,
+                    modelContainer: modelContainer
+                )
+                    .environment(careShareImportRouter)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.hidden)
+            }
+            .alert("Couldn’t open care snapshot", isPresented: Binding(
+                get: { careShareImportRouter.errorMessage != nil },
+                set: { if !$0 { careShareImportRouter.errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(careShareImportRouter.errorMessage ?? "")
+            }
         }
         .modelContainer(modelContainer)
+    }
+
+    private var pendingCareShareImport: Binding<CareSharePackage?> {
+        Binding(
+            get: {
+                guard storeError == nil,
+                      !appLock.isEnabled || appLock.isUnlocked else {
+                    return nil
+                }
+                return careShareImportRouter.pendingPackage
+            },
+            set: { package in
+                if let package {
+                    careShareImportRouter.pendingPackage = package
+                } else {
+                    careShareImportRouter.clear()
+                }
+            }
+        )
     }
 }
 
