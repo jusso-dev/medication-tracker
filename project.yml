@@ -1,0 +1,64 @@
+name: MedicationTracker
+
+options:
+  bundleIdPrefix: dev.jusso
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.0"
+
+targets:
+  MedicationTracker:
+    type: application
+    platform: iOS
+    sources:
+      - path: MedicationTracker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jusso.medicationtracker
+        PRODUCT_NAME: Medication Tracker
+        PRODUCT_MODULE_NAME: MedicationTracker
+        INFOPLIST_FILE: MedicationTracker/Support/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets:
+        - MedicationTrackerTests
+        - MedicationTrackerUITests
+
+  MedicationTrackerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/MedicationTrackerTests
+    dependencies:
+      - target: MedicationTracker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jusso.medicationtracker.tests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Medication Tracker.app/Medication Tracker"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  MedicationTrackerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/MedicationTrackerUITests
+    dependencies:
+      - target: MedicationTracker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jusso.medicationtracker.uitests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: MedicationTracker
