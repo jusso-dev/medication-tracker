@@ -108,6 +108,7 @@ struct DoseServiceTests {
             for: Medicine.self,
             TreatmentPlan.self,
             DoseEvent.self,
+            RefillScript.self,
             configurations: configuration
         )
         let medicine = Medicine(
