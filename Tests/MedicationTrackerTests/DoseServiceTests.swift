@@ -126,3 +126,46 @@ struct DoseServiceTests {
         return (container, medicine)
     }
 }
+
+@MainActor
+@Suite("Local data store")
+struct MedicationDataStoreTests {
+    @Test("Saved medicines survive reopening the on-device store")
+    func savedMedicinesSurviveReopening() throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: storeDirectory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+
+        let storeURL = storeDirectory.appendingPathComponent("MedicationTracker.store")
+        let medicineID = UUID()
+
+        do {
+            let configuration = ModelConfiguration(url: storeURL)
+            let container = try MedicationDataStore.makeContainer(
+                configuration: configuration
+            )
+            let medicine = Medicine(
+                id: medicineID,
+                name: "Persistent medicine",
+                amount: 1,
+                unit: .tablet,
+                asNeeded: true,
+                startDate: .now
+            )
+            container.mainContext.insert(medicine)
+            try container.mainContext.save()
+        }
+
+        let configuration = ModelConfiguration(url: storeURL)
+        let reopenedContainer = try MedicationDataStore.makeContainer(
+            configuration: configuration
+        )
+        let medicines = try reopenedContainer.mainContext.fetch(FetchDescriptor<Medicine>())
+
+        #expect(medicines.contains { $0.id == medicineID })
+    }
+}

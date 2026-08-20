@@ -1,6 +1,25 @@
 import SwiftData
 import SwiftUI
 
+enum MedicationDataStore {
+    static func makeContainer(isStoredInMemoryOnly: Bool = false) throws -> ModelContainer {
+        let configuration = ModelConfiguration(
+            isStoredInMemoryOnly: isStoredInMemoryOnly
+        )
+        return try makeContainer(configuration: configuration)
+    }
+
+    static func makeContainer(configuration: ModelConfiguration) throws -> ModelContainer {
+        try ModelContainer(
+            for: Medicine.self,
+            TreatmentPlan.self,
+            DoseEvent.self,
+            RefillScript.self,
+            configurations: configuration
+        )
+    }
+}
+
 @main
 struct MedicationTrackerApp: App {
     @Environment(\.scenePhase) private var scenePhase
@@ -20,33 +39,14 @@ struct MedicationTrackerApp: App {
         let resolvedContainer: ModelContainer
 
         do {
-            if isTesting {
-                let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
-                resolvedContainer = try ModelContainer(
-                    for: Medicine.self,
-                    TreatmentPlan.self,
-                    DoseEvent.self,
-                    RefillScript.self,
-                    configurations: configuration
-                )
-            } else {
-                resolvedContainer = try ModelContainer(
-                    for: Medicine.self,
-                    TreatmentPlan.self,
-                    DoseEvent.self,
-                    RefillScript.self
-                )
-            }
+            resolvedContainer = try MedicationDataStore.makeContainer(
+                isStoredInMemoryOnly: isTesting
+            )
         } catch {
             launchError = error.localizedDescription
-            let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
             do {
-                resolvedContainer = try ModelContainer(
-                    for: Medicine.self,
-                    TreatmentPlan.self,
-                    DoseEvent.self,
-                    RefillScript.self,
-                    configurations: configuration
+                resolvedContainer = try MedicationDataStore.makeContainer(
+                    isStoredInMemoryOnly: true
                 )
             } catch {
                 fatalError("Unable to create the medication store: \(error)")
