@@ -113,7 +113,7 @@
 		83F5E88B0CCC729A9CEA7610 /* DurationStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurationStep.swift; sourceTree = "<group>"; };
 		848D5C5A39FFEF6E506405ED /* AddNewFlowSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddNewFlowSheet.swift; sourceTree = "<group>"; };
 		8869FB295E771F239B302928 /* CareShareImportRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareShareImportRouter.swift; sourceTree = "<group>"; };
-		8BF4C709DE1AAB6CFF52269D /* MedicationTracker.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MedicationTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8BF4C709DE1AAB6CFF52269D /* Medication Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Medication Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9758EB10D5781F74A7DD067D /* CareShareService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareShareService.swift; sourceTree = "<group>"; };
 		98AA7B01E360D47BB008E7A0 /* RefillScriptEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefillScriptEditorView.swift; sourceTree = "<group>"; };
 		9B78C349489B1C06FF9F5F15 /* MedicationScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicationScanView.swift; sourceTree = "<group>"; };
@@ -229,7 +229,7 @@
 		61DA352D2F93B74C110155E3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				8BF4C709DE1AAB6CFF52269D /* MedicationTracker.app */,
+				8BF4C709DE1AAB6CFF52269D /* Medication Tracker.app */,
 				4DA0A4F874C874B23944F973 /* MedicationTrackerTests.xctest */,
 				A2019E0D59D3A99E5466FADB /* MedicationTrackerUITests.xctest */,
 			);
@@ -460,7 +460,7 @@
 			packageProductDependencies = (
 			);
 			productName = MedicationTracker;
-			productReference = 8BF4C709DE1AAB6CFF52269D /* MedicationTracker.app */;
+			productReference = 8BF4C709DE1AAB6CFF52269D /* Medication Tracker.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -744,6 +744,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2L7828W29X;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MedicationTracker/Support/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -764,6 +765,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2L7828W29X;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MedicationTracker/Support/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
