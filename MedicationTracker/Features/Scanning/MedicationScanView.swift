@@ -9,6 +9,7 @@ struct MedicationScanView: View {
     @Environment(\.openURL) private var openURL
 
     let title: String
+    let useButtonTitle: String
     let onUse: (MedicationScanResult) -> Void
 
     @State private var selectedPhoto: PhotosPickerItem?
@@ -21,6 +22,16 @@ struct MedicationScanView: View {
     @AccessibilityFocusState private var resultHeadingIsFocused: Bool
 
     private let ocrService = MedicationOCRService()
+
+    init(
+        title: String,
+        useButtonTitle: String = "Use scanned details",
+        onUse: @escaping (MedicationScanResult) -> Void
+    ) {
+        self.title = title
+        self.useButtonTitle = useButtonTitle
+        self.onUse = onUse
+    }
 
     var body: some View {
         NavigationStack {
@@ -124,6 +135,17 @@ struct MedicationScanView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        #if DEBUG
+        .onAppear {
+            guard ProcessInfo.processInfo.arguments.contains("--ui-testing-scan-result") else {
+                return
+            }
+            result = MedicationOCRService.parse(lines: [
+                "AMOXICILLIN 500 mg",
+                "EXP 08/2027"
+            ])
+        }
+        #endif
     }
 
     private var captureActions: some View {
@@ -207,7 +229,7 @@ struct MedicationScanView: View {
                 onUse(result)
                 dismiss()
             } label: {
-                Label("Use scanned details", systemImage: "checkmark")
+                Label(useButtonTitle, systemImage: "checkmark")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 50)
@@ -216,6 +238,7 @@ struct MedicationScanView: View {
             }
             .buttonStyle(.plain)
             .disabled(result.rawText.isEmpty)
+            .accessibilityIdentifier("scan.use")
         }
         .medicationCard()
     }

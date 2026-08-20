@@ -69,7 +69,11 @@ struct MedicineWizardView: View {
     private var stepView: some View {
         switch step {
         case 0:
-            MedicineNameStep(draft: draft)
+            MedicineNameStep(draft: draft) {
+                movingForward = true
+                scheduleValidationMessage = nil
+                step = 1
+            }
         case 1:
             DosageStep(draft: draft, showAmountTooltip: $showAmountTooltip)
         case 2:

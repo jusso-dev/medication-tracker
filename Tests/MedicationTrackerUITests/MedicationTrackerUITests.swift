@@ -111,6 +111,38 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Paracetamol"].exists)
     }
 
+    func testScannedMedicineContinuesReviewAndSaves() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--ui-testing-scan-result"]
+        app.launch()
+
+        app.buttons["Add new"].tap()
+        app.buttons["add.choice.Medicine"].tap()
+        XCTAssertTrue(app.textFields["medicine.name"].waitForExistence(timeout: 3))
+        app.buttons["Scan medicine label"].tap()
+
+        let useScan = app.buttons["scan.use"]
+        XCTAssertTrue(useScan.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Amoxicillin"].exists)
+        useScan.tap()
+
+        XCTAssertTrue(app.staticTexts["Set your dosage"].waitForExistence(timeout: 3))
+        let amount = app.staticTexts["dose.amount"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 3))
+        XCTAssertEqual(amount.label, "Dose 500 mg")
+        app.buttons["wizard.next"].tap()
+        XCTAssertTrue(app.staticTexts["Any schedule?"].waitForExistence(timeout: 3))
+        app.buttons["wizard.next"].tap()
+        XCTAssertTrue(
+            app.staticTexts["How long will you take it?"].waitForExistence(timeout: 3)
+        )
+        app.buttons["duration.ongoing"].tap()
+        app.buttons["wizard.save"].tap()
+
+        XCTAssertTrue(app.staticTexts["Amoxicillin"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["500 mg"].exists)
+    }
+
     func testScheduledMedicineSelectsAllDaysAndContinues() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]

@@ -168,4 +168,42 @@ struct MedicationDataStoreTests {
 
         #expect(medicines.contains { $0.id == medicineID })
     }
+
+    @Test("Scanned medicine details persist after reopening the store")
+    func scannedMedicineSurvivesReopening() throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: storeDirectory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+
+        let storeURL = storeDirectory.appendingPathComponent("MedicationTracker.store")
+        let scan = MedicationOCRService.parse(lines: [
+            "AMOXICILLIN 500 mg",
+            "EXP 08/2027"
+        ])
+
+        do {
+            let container = try MedicationDataStore.makeContainer(
+                configuration: ModelConfiguration(url: storeURL)
+            )
+            let draft = MedicineDraft()
+            draft.applyScan(scan)
+            draft.setOngoing()
+            _ = try draft.save(context: container.mainContext)
+        }
+
+        let reopenedContainer = try MedicationDataStore.makeContainer(
+            configuration: ModelConfiguration(url: storeURL)
+        )
+        let medicines = try reopenedContainer.mainContext.fetch(FetchDescriptor<Medicine>())
+        let medicine = try #require(medicines.first)
+
+        #expect(medicine.name == "Amoxicillin")
+        #expect(medicine.amount == 500)
+        #expect(medicine.unit == .mg)
+        #expect(medicine.packageExpiryDate != nil)
+    }
 }

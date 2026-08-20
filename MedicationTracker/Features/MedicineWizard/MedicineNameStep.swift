@@ -2,9 +2,20 @@ import SwiftUI
 
 struct MedicineNameStep: View {
     @Bindable var draft: MedicineDraft
+    let onScanApplied: () -> Void
+
     @FocusState private var nameIsFocused: Bool
     @State private var showingScanner = false
     @State private var searchText = ""
+    @State private var advanceAfterScan = false
+
+    init(
+        draft: MedicineDraft,
+        onScanApplied: @escaping () -> Void = {}
+    ) {
+        self.draft = draft
+        self.onScanApplied = onScanApplied
+    }
 
     var body: some View {
         ScrollView {
@@ -84,10 +95,14 @@ struct MedicineNameStep: View {
         .onChange(of: searchText) { _, value in
             draft.name = value
         }
-        .sheet(isPresented: $showingScanner) {
-            MedicationScanView(title: "Scan Medicine") { result in
+        .sheet(isPresented: $showingScanner, onDismiss: scanDidDismiss) {
+            MedicationScanView(
+                title: "Scan Medicine",
+                useButtonTitle: "Review and continue"
+            ) { result in
                 draft.applyScan(result)
                 searchText = draft.name
+                advanceAfterScan = true
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
@@ -159,4 +174,9 @@ struct MedicineNameStep: View {
         return AustralianMedicineCatalogue.search(searchText, limit: 6)
     }
 
+    private func scanDidDismiss() {
+        guard advanceAfterScan else { return }
+        advanceAfterScan = false
+        onScanApplied()
+    }
 }
