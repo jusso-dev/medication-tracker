@@ -9,7 +9,7 @@ final class MedicineDraft {
     var amountText = ""
     var unit: MedicineUnit = .tablet
     var daysOfWeek: Set<Int> = []
-    var times: [Int] = []
+    var scheduledTimes: [ScheduledTime] = []
     var intervalMinutes: Int?
     var intervalLinked = false
     var remindersOn = false
@@ -26,8 +26,14 @@ final class MedicineDraft {
     var refillAtText = "5"
     var dayPreset: String?
     var timePreset: String?
+    var scanImageData: Data?
+    var scanImageFileExtension = "jpg"
 
     let medicine: Medicine?
+
+    var times: [Int] {
+        scheduledTimes.map(\.minutes)
+    }
 
     var parsedAmount: Decimal? {
         amountText.medicationDecimal
@@ -43,8 +49,8 @@ final class MedicineDraft {
     }
 
     var scheduleIsValid: Bool {
-        (daysOfWeek.isEmpty && times.isEmpty)
-            || (!daysOfWeek.isEmpty && !times.isEmpty)
+        (daysOfWeek.isEmpty && scheduledTimes.isEmpty)
+            || (!daysOfWeek.isEmpty && !scheduledTimes.isEmpty)
     }
 
     var durationIsValid: Bool {
@@ -52,7 +58,7 @@ final class MedicineDraft {
     }
 
     var isAsNeeded: Bool {
-        daysOfWeek.isEmpty && times.isEmpty
+        daysOfWeek.isEmpty && scheduledTimes.isEmpty
     }
 
     var contextLine: String {
@@ -68,7 +74,7 @@ final class MedicineDraft {
         amountText = medicine.amount.medicationFormatted
         unit = medicine.unit
         daysOfWeek = Set(medicine.daysOfWeek)
-        times = medicine.times.sorted()
+        scheduledTimes = medicine.times.sorted().map { ScheduledTime(minutes: $0) }
         intervalMinutes = medicine.intervalMinutes
         intervalLinked = medicine.intervalLinked
         remindersOn = medicine.remindersOn
@@ -108,7 +114,7 @@ final class MedicineDraft {
 
     func clearSchedule() {
         daysOfWeek = []
-        times = []
+        scheduledTimes = []
         intervalMinutes = nil
         intervalLinked = false
         remindersOn = false
@@ -128,11 +134,11 @@ final class MedicineDraft {
 
     func cycleTimePreset() {
         if timePreset == "Every 12h" {
-            times = [0, 480, 960]
+            scheduledTimes = [0, 480, 960].map { ScheduledTime(minutes: $0) }
             intervalMinutes = 480
             timePreset = "Every 8h"
         } else {
-            times = [0, 720]
+            scheduledTimes = [0, 720].map { ScheduledTime(minutes: $0) }
             intervalMinutes = 720
             timePreset = "Every 12h"
         }
@@ -140,39 +146,66 @@ final class MedicineDraft {
     }
 
     func addTime() {
-        let proposed = times.last.map { ($0 + 60) % 1_440 } ?? 480
-        times.append(proposed)
-        times = Array(Set(times)).sorted()
+        let proposed = scheduledTimes.last.map { ($0.minutes + 60) % 1_440 } ?? 480
+        guard !scheduledTimes.contains(where: { $0.minutes == proposed }) else {
+            return
+        }
+        scheduledTimes.append(ScheduledTime(minutes: proposed))
+        scheduledTimes.sort { $0.minutes < $1.minutes }
         intervalMinutes = nil
         intervalLinked = false
         timePreset = nil
     }
 
     func removeTime(_ minutes: Int) {
-        times.removeAll { $0 == minutes }
+        scheduledTimes.removeAll { $0.minutes == minutes }
+        intervalMinutes = nil
+        intervalLinked = false
+        timePreset = nil
+    }
+
+    func removeTime(id: UUID) {
+        scheduledTimes.removeAll { $0.id == id }
         intervalMinutes = nil
         intervalLinked = false
         timePreset = nil
     }
 
     @discardableResult
+    func updateTime(id: UUID, to newValue: Int) -> Bool {
+        guard let index = scheduledTimes.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        return updateTime(at: index, to: newValue)
+    }
+
+    @discardableResult
     func updateTime(from oldValue: Int, to newValue: Int) -> Bool {
+        guard let index = scheduledTimes.firstIndex(where: { $0.minutes == oldValue }) else {
+            return false
+        }
+        return updateTime(at: index, to: newValue)
+    }
+
+    @discardableResult
+    private func updateTime(at index: Int, to newValue: Int) -> Bool {
+        let oldValue = scheduledTimes[index].minutes
         if intervalLinked {
-            times = ScheduleCalculator.shiftedLinkedTimes(
-                times,
-                changing: oldValue,
-                to: newValue
-            )
-            return true
-        } else if let index = times.firstIndex(of: oldValue) {
-            guard oldValue == newValue || !times.contains(newValue) else {
-                return false
+            let delta = newValue - oldValue
+            for offset in scheduledTimes.indices {
+                let shifted = ((scheduledTimes[offset].minutes + delta) % 1_440 + 1_440) % 1_440
+                scheduledTimes[offset].minutes = shifted
             }
-            times[index] = newValue
-            times.sort()
+            scheduledTimes.sort { $0.minutes < $1.minutes }
             return true
         }
-        return false
+
+        guard oldValue == newValue || !scheduledTimes.contains(where: { $0.minutes == newValue }) else {
+            return false
+        }
+        scheduledTimes[index].minutes = newValue
+        scheduledTimes.sort { $0.minutes < $1.minutes }
+        return true
     }
 
     func updateEndDateFromDuration() {
@@ -218,9 +251,17 @@ final class MedicineDraft {
             packageExpiryDate = expiryDate
             packageExpiryEnabled = true
         }
+        if let imageData = result.imageData {
+            scanImageData = imageData
+            scanImageFileExtension = result.imageFileExtension
+        }
     }
 
-    func save(context: ModelContext, plan: TreatmentPlan? = nil) throws -> Medicine {
+    func save(
+        context: ModelContext,
+        plan: TreatmentPlan? = nil,
+        scanImageStore: ScanImageStore = .shared
+    ) throws -> Medicine {
         guard let amount = parsedAmount, amount > 0 else {
             throw MedicineDraftError.invalidAmount
         }
@@ -276,6 +317,14 @@ final class MedicineDraft {
                 plan: plan
             )
             context.insert(target)
+        }
+
+        if let scanImageData {
+            target.scanImageFileName = try scanImageStore.write(
+                scanImageData,
+                medicineID: target.id,
+                fileExtension: scanImageFileExtension
+            )
         }
 
         if let quantity, let refill, quantity > refill {
