@@ -1,19 +1,6 @@
 import Foundation
 import Vision
 
-struct MedicationScanResult: Sendable {
-    let medicineName: String?
-    let amount: Decimal?
-    let unit: MedicineUnit?
-    let expiryDate: Date?
-    let repeatsRemaining: Int?
-    let repeatsAuthorised: Int?
-    let scriptNumber: String?
-    let prescriber: String?
-    let rawText: String
-    let confidence: Float
-}
-
 actor MedicationOCRService {
     func scan(imageData: [Data]) throws -> MedicationScanResult {
         var lines: [String] = []
@@ -39,12 +26,17 @@ actor MedicationOCRService {
             }
         }
 
-        return Self.parse(
+        var result = Self.parse(
             lines: lines,
             confidence: confidences.isEmpty
                 ? 0
                 : confidences.reduce(0, +) / Float(confidences.count)
         )
+        result.imageData = imageData.first
+        if let first = imageData.first {
+            result.imageFileExtension = ScanImageStore.fileExtension(for: first)
+        }
+        return result
     }
 
     nonisolated static func parse(
@@ -82,7 +74,7 @@ actor MedicationOCRService {
                 in: rawText
             ),
             prescriber: capture(
-                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\-]{2,40})"#,
+                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\\-]{2,40})"#,
                 in: rawText
             )?.trimmingCharacters(in: .whitespacesAndNewlines).capitalized,
             rawText: rawText,
@@ -283,23 +275,23 @@ actor MedicationOCRService {
             return nil
         }
         let unsafeLabelPatterns = [
-            #"\bEXP\b"#, #"\bEXPIRY\b"#, #"\bUSE\s+BY\b"#,
-            #"\bBATCH\b"#, #"\bLOT\b"#, #"\bSCRIPT\b"#, #"\bREPEATS?\b"#,
-            #"\bPATIENT\b"#, #"\bPHARMACY\b"#, #"\bPRESCRIBER\b"#,
-            #"\bDOCTOR\b"#, #"\bTAKE\b"#, #"\bGIVE\b"#, #"\bDOSE\b"#,
-            #"\bUSE\b"#
+            #"\\bEXP\\b"#, #"\\bEXPIRY\\b"#, #"\\bUSE\\s+BY\\b"#,
+            #"\\bBATCH\\b"#, #"\\bLOT\\b"#, #"\\bSCRIPT\\b"#, #"\\bREPEATS?\\b"#,
+            #"\\bPATIENT\\b"#, #"\\bPHARMACY\\b"#, #"\\bPRESCRIBER\\b"#,
+            #"\\bDOCTOR\\b"#, #"\\bTAKE\\b"#, #"\\bGIVE\\b"#, #"\\bDOSE\\b"#,
+            #"\\bUSE\\b"#
         ]
         let strengthLine = lines[strengthLineIndex]
         let upper = strengthLine.uppercased()
         if !containsAnyPattern(unsafeLabelPatterns, in: upper) {
             let cleaned = strengthLine
                 .replacingOccurrences(
-                    of: #"\d+(?:[.,]\d+)?\s*(?:MG|G)(?:\s*(?:/|PER)\s*(?:\d+(?:[.,]\d+)?\s*)?ML)?"#,
+                    of: #"\\d+(?:[.,]\\d+)?\\s*(?:MG|G)(?:\\s*(?:/|PER)\\s*(?:\\d+(?:[.,]\\d+)?\\s*)?ML)?"#,
                     with: "",
                     options: [.regularExpression, .caseInsensitive]
                 )
                 .replacingOccurrences(
-                    of: #"\b(?:TABLETS?|CAPSULES?|ORAL|SOLUTION|SUSPENSION)\b"#,
+                    of: #"\\b(?:TABLETS?|CAPSULES?|ORAL|SOLUTION|SUSPENSION)\\b"#,
                     with: "",
                     options: [.regularExpression, .caseInsensitive]
                 )
@@ -312,8 +304,8 @@ actor MedicationOCRService {
         }
 
         let excludedPatterns = unsafeLabelPatterns + [
-            #"\bTABLETS?\b"#, #"\bCAPSULES?\b"#, #"\bORAL\b"#,
-            #"\bSOLUTION\b"#, #"\bSUSPENSION\b"#
+            #"\\bTABLETS?\\b"#, #"\\bCAPSULES?\\b"#, #"\\bORAL\\b"#,
+            #"\\bSOLUTION\\b"#, #"\\bSUSPENSION\\b"#
         ]
         let adjacentIndices = [strengthLineIndex - 1, strengthLineIndex + 1]
         for index in adjacentIndices where lines.indices.contains(index) {
