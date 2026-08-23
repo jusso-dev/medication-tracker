@@ -27,6 +27,7 @@ final class Medicine {
     var lowStockNotificationSent: Bool
     var statusRawValue: String
     var completedAt: Date?
+    var scanImageFileName: String?
     @Relationship(inverse: \TreatmentPlan.medicines) var plan: TreatmentPlan?
     @Relationship(deleteRule: .cascade, inverse: \DoseEvent.medicine)
     var doseEvents: [DoseEvent]
@@ -83,6 +84,22 @@ final class Medicine {
         times.sorted()
     }
 
+    var scanImageURL: URL? {
+        ScanImageStore.shared.url(for: id, fileName: scanImageFileName)
+    }
+
+    var scanImageData: Data? {
+        ScanImageStore.shared.read(medicineID: id, fileName: scanImageFileName)
+    }
+
+    func scanImageURL(store: ScanImageStore) -> URL? {
+        store.url(for: id, fileName: scanImageFileName)
+    }
+
+    func scanImageData(store: ScanImageStore) -> Data? {
+        store.read(medicineID: id, fileName: scanImageFileName)
+    }
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -102,7 +119,8 @@ final class Medicine {
         quantityRemaining: Decimal? = nil,
         refillAt: Decimal? = nil,
         status: MedicineStatus = .active,
-        plan: TreatmentPlan? = nil
+        plan: TreatmentPlan? = nil,
+        scanImageFileName: String? = nil
     ) {
         self.id = id
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -126,6 +144,7 @@ final class Medicine {
         self.refillAt = refillAt
         self.lowStockNotificationSent = false
         self.statusRawValue = status.rawValue
+        self.scanImageFileName = scanImageFileName
         self.plan = plan
         self.doseEvents = []
         self.refillScripts = []
