@@ -3,10 +3,12 @@ import Foundation
 extension Decimal {
     var medicationFormatted: String {
         let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_AU")
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 3
         formatter.minimumFractionDigits = 0
         formatter.usesGroupingSeparator = false
+        formatter.decimalSeparator = "."
         return formatter.string(from: self as NSDecimalNumber) ?? "\(self)"
     }
 }
@@ -18,7 +20,8 @@ extension String {
     }
 
     var medicationDecimal: Decimal? {
-        switch trimmingCharacters(in: .whitespacesAndNewlines) {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        switch trimmed {
         case "½":
             return Decimal(string: "0.5")
         case "⅓":
@@ -28,7 +31,14 @@ extension String {
         case "¾":
             return Decimal(string: "0.75")
         default:
-            return Decimal(string: self, locale: Locale(identifier: "en_AU"))
+            let commaCount = trimmed.filter { $0 == "," }.count
+            if commaCount == 1, !trimmed.contains(".") {
+                return Decimal(
+                    string: trimmed.replacingOccurrences(of: ",", with: "."),
+                    locale: Locale(identifier: "en_US_POSIX")
+                )
+            }
+            return Decimal(string: trimmed, locale: Locale(identifier: "en_AU"))
         }
     }
 }
