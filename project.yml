@@ -19,6 +19,7 @@ targets:
   MedicationTracker:
     type: application
     platform: iOS
+    productName: Medication Tracker
     sources:
       - path: MedicationTracker
     settings:
@@ -31,6 +32,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 2L7828W29X
     scheme:
       testTargets:
         - MedicationTrackerTests

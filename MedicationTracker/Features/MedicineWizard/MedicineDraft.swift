@@ -2,6 +2,16 @@ import Foundation
 import Observation
 import SwiftData
 
+struct MedicineDraftTime: Identifiable, Equatable {
+    let id: UUID
+    var minutes: Int
+
+    init(id: UUID = UUID(), minutes: Int) {
+        self.id = id
+        self.minutes = minutes
+    }
+}
+
 @MainActor
 @Observable
 final class MedicineDraft {
@@ -9,7 +19,7 @@ final class MedicineDraft {
     var amountText = ""
     var unit: MedicineUnit = .tablet
     var daysOfWeek: Set<Int> = []
-    var times: [Int] = []
+    private(set) var timeEntries: [MedicineDraftTime] = []
     var intervalMinutes: Int?
     var intervalLinked = false
     var remindersOn = false
@@ -19,6 +29,7 @@ final class MedicineDraft {
     var durationUnit: DurationUnit = .days
     var durationValue = 0
     var notes = ""
+    var scannedImageData: Data?
     var packageExpiryDate: Date?
     var packageExpiryEnabled = false
     var dailyCapText = ""
@@ -28,6 +39,10 @@ final class MedicineDraft {
     var timePreset: String?
 
     let medicine: Medicine?
+
+    var times: [Int] {
+        timeEntries.map(\.minutes).sorted()
+    }
 
     var parsedAmount: Decimal? {
         amountText.medicationDecimal
@@ -68,7 +83,7 @@ final class MedicineDraft {
         amountText = medicine.amount.medicationFormatted
         unit = medicine.unit
         daysOfWeek = Set(medicine.daysOfWeek)
-        times = medicine.times.sorted()
+        replaceTimes(with: medicine.times)
         intervalMinutes = medicine.intervalMinutes
         intervalLinked = medicine.intervalLinked
         remindersOn = medicine.remindersOn
@@ -76,6 +91,7 @@ final class MedicineDraft {
         endDate = medicine.endDate
         isOngoing = medicine.endDate == nil
         notes = medicine.notes ?? ""
+        scannedImageData = medicine.scannedImageData
         packageExpiryDate = medicine.packageExpiryDate
         packageExpiryEnabled = medicine.packageExpiryDate != nil
         dailyCapText = medicine.dailyCap.map(String.init) ?? ""
@@ -108,7 +124,7 @@ final class MedicineDraft {
 
     func clearSchedule() {
         daysOfWeek = []
-        times = []
+        timeEntries = []
         intervalMinutes = nil
         intervalLinked = false
         remindersOn = false
@@ -128,11 +144,11 @@ final class MedicineDraft {
 
     func cycleTimePreset() {
         if timePreset == "Every 12h" {
-            times = [0, 480, 960]
+            replaceTimes(with: [0, 480, 960])
             intervalMinutes = 480
             timePreset = "Every 8h"
         } else {
-            times = [0, 720]
+            replaceTimes(with: [0, 720])
             intervalMinutes = 720
             timePreset = "Every 12h"
         }
@@ -141,15 +157,23 @@ final class MedicineDraft {
 
     func addTime() {
         let proposed = times.last.map { ($0 + 60) % 1_440 } ?? 480
-        times.append(proposed)
-        times = Array(Set(times)).sorted()
+        guard !times.contains(proposed) else { return }
+        timeEntries.append(MedicineDraftTime(minutes: proposed))
+        timeEntries.sort { $0.minutes < $1.minutes }
         intervalMinutes = nil
         intervalLinked = false
         timePreset = nil
     }
 
     func removeTime(_ minutes: Int) {
-        times.removeAll { $0 == minutes }
+        guard let entry = timeEntries.first(where: { $0.minutes == minutes }) else {
+            return
+        }
+        removeTime(id: entry.id)
+    }
+
+    func removeTime(id: UUID) {
+        timeEntries.removeAll { $0.id == id }
         intervalMinutes = nil
         intervalLinked = false
         timePreset = nil
@@ -157,22 +181,40 @@ final class MedicineDraft {
 
     @discardableResult
     func updateTime(from oldValue: Int, to newValue: Int) -> Bool {
+        guard let entry = timeEntries.first(where: { $0.minutes == oldValue }) else {
+            return false
+        }
+        return updateTime(id: entry.id, to: newValue)
+    }
+
+    @discardableResult
+    func updateTime(id: UUID, to newValue: Int) -> Bool {
+        guard let index = timeEntries.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        let oldValue = timeEntries[index].minutes
         if intervalLinked {
-            times = ScheduleCalculator.shiftedLinkedTimes(
-                times,
-                changing: oldValue,
-                to: newValue
-            )
-            return true
-        } else if let index = times.firstIndex(of: oldValue) {
-            guard oldValue == newValue || !times.contains(newValue) else {
-                return false
+            let delta = newValue - oldValue
+            timeEntries = timeEntries.map { entry in
+                MedicineDraftTime(
+                    id: entry.id,
+                    minutes: ((entry.minutes + delta) % 1_440 + 1_440) % 1_440
+                )
             }
-            times[index] = newValue
-            times.sort()
+            timeEntries.sort { $0.minutes < $1.minutes }
             return true
         }
-        return false
+        guard oldValue == newValue
+                || !timeEntries.contains(where: { $0.id != id && $0.minutes == newValue }) else {
+            return false
+        }
+        timeEntries[index].minutes = newValue
+        timeEntries.sort { $0.minutes < $1.minutes }
+        return true
+    }
+
+    func time(for id: UUID) -> Int? {
+        timeEntries.first(where: { $0.id == id })?.minutes
     }
 
     func updateEndDateFromDuration() {
@@ -218,6 +260,9 @@ final class MedicineDraft {
             packageExpiryDate = expiryDate
             packageExpiryEnabled = true
         }
+        if let scannedImageData = result.scannedImageData {
+            self.scannedImageData = scannedImageData
+        }
     }
 
     func save(context: ModelContext, plan: TreatmentPlan? = nil) throws -> Medicine {
@@ -246,6 +291,7 @@ final class MedicineDraft {
             target.endDate = isOngoing ? nil : endDate?.startOfDay
             target.remindersOn = remindersOn && !isAsNeeded
             target.notes = notes.nilIfBlank
+            target.scannedImageData = scannedImageData
             target.packageExpiryDate = packageExpiryEnabled
                 ? packageExpiryDate?.startOfDay
                 : nil
@@ -269,6 +315,7 @@ final class MedicineDraft {
                 endDate: isOngoing ? nil : endDate,
                 remindersOn: remindersOn && !isAsNeeded,
                 notes: notes,
+                scannedImageData: scannedImageData,
                 packageExpiryDate: packageExpiryEnabled ? packageExpiryDate : nil,
                 dailyCap: dailyCap,
                 quantityRemaining: quantity,
@@ -293,6 +340,12 @@ final class MedicineDraft {
         } else if intervalLinked && intervalMinutes == 720 {
             timePreset = "Every 12h"
         }
+    }
+
+    private func replaceTimes(with values: [Int]) {
+        timeEntries = Array(Set(values))
+            .sorted()
+            .map { MedicineDraftTime(minutes: $0) }
     }
 
     private func updateDayPresetLabel() {

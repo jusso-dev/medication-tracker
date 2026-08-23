@@ -108,11 +108,22 @@ struct DosageStep: View {
                 }
 
                 keypadButton("0") {
-                    if draft.amountText != "0" {
+                    if fractions.contains(draft.amountText) {
+                        draft.amountText = "0"
+                    } else if draft.amountText != "0" {
                         draft.amountText.append("0")
                     }
                 }
-                .gridCellColumns(2)
+
+                keypadButton(".") {
+                    if draft.amountText.isEmpty || fractions.contains(draft.amountText) {
+                        draft.amountText = "0."
+                    } else if !draft.amountText.contains(".") {
+                        draft.amountText.append(".")
+                    }
+                }
+                .accessibilityLabel("Decimal point")
+                .accessibilityIdentifier("dose.key.decimal")
 
                 Button {
                     if !draft.amountText.isEmpty {
@@ -128,6 +139,11 @@ struct DosageStep: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Delete last digit")
             }
+
+            Text("Use the decimal point for strengths such as 12.5 mg.")
+                .font(.footnote)
+                .foregroundStyle(AppTheme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
                 draft.amountText = ""

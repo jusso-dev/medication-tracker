@@ -140,10 +140,13 @@ struct MedicationScanView: View {
             guard ProcessInfo.processInfo.arguments.contains("--ui-testing-scan-result") else {
                 return
             }
+            let scanImage = UIImage(systemName: "pill.fill")?
+                .withTintColor(.systemBlue)
+                .pngData()
             result = MedicationOCRService.parse(lines: [
                 "AMOXICILLIN 500 mg",
                 "EXP 08/2027"
-            ])
+            ], scannedImageData: scanImage)
         }
         #endif
     }
@@ -193,6 +196,21 @@ struct MedicationScanView: View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeading(title: "Detected details")
                 .accessibilityFocused($resultHeadingIsFocused)
+
+            if let imageData = result.scannedImageData,
+               let image = UIImage(data: imageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 220)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
+                    .accessibilityLabel("Scanned medication image")
+
+                Label("This image will be saved with the medication", systemImage: "photo.badge.checkmark")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(AppTheme.green)
+            }
 
             detectedRow("Medicine", value: result.medicineName)
             if let amount = result.amount, let unit = result.unit {

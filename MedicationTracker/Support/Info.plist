@@ -65,6 +65,26 @@
                 <string>application/vnd.jusso.medication-care+json</string>
             </dict>
         </dict>
+        <dict>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.json</string>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeDescription</key>
+            <string>Medication Tracker Backup</string>
+            <key>UTTypeIdentifier</key>
+            <string>dev.jusso.medicationtracker.backup</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>medbackup</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/vnd.jusso.medication-backup+json</string>
+            </dict>
+        </dict>
     </array>
     <key>UILaunchScreen</key>
     <dict>

@@ -3,11 +3,12 @@ import SwiftUI
 struct DurationStep: View {
     @Bindable var draft: MedicineDraft
 
-    @State private var activeField: DurationDateField = .end
+    @State private var activeField: DurationDateField
     @State private var displayedMonth: Date
 
     init(draft: MedicineDraft) {
         self.draft = draft
+        _activeField = State(initialValue: draft.isOngoing ? .start : .end)
         _displayedMonth = State(initialValue: draft.startDate)
     }
 
@@ -15,6 +16,7 @@ struct DurationStep: View {
         ScrollView {
             VStack(spacing: 18) {
                 dateCards
+                ongoingToggle
 
                 MonthRangeCalendar(
                     displayedMonth: $displayedMonth,
@@ -23,23 +25,25 @@ struct DurationStep: View {
                     onSelect: selectDate
                 )
 
-                Picker("Duration unit", selection: $draft.durationUnit) {
-                    ForEach(DurationUnit.allCases) { unit in
-                        Text(unit.rawValue).tag(unit)
+                if !draft.isOngoing {
+                    Picker("Duration unit", selection: $draft.durationUnit) {
+                        ForEach(DurationUnit.allCases) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: draft.durationUnit) {
-                    if let endDate = draft.endDate {
-                        draft.durationValue = ScheduleCalculator.durationValue(
-                            from: draft.startDate,
-                            to: endDate,
-                            unit: draft.durationUnit
-                        )
+                    .pickerStyle(.segmented)
+                    .onChange(of: draft.durationUnit) {
+                        if let endDate = draft.endDate {
+                            draft.durationValue = ScheduleCalculator.durationValue(
+                                from: draft.startDate,
+                                to: endDate,
+                                unit: draft.durationUnit
+                            )
+                        }
                     }
-                }
 
-                durationStepper
+                    durationStepper
+                }
 
                 Text(durationExplanation)
                     .font(.footnote)
@@ -85,8 +89,22 @@ struct DurationStep: View {
         .accessibilityValue(draft.startDate.longMedicationDate)
     }
 
+    @ViewBuilder
     private var endCard: some View {
-        HStack {
+        if draft.isOngoing {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("End Date")
+                    .font(.caption.weight(.semibold))
+                Label("No end date", systemImage: "infinity")
+                    .font(.headline)
+            }
+            .foregroundStyle(AppTheme.title)
+            .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
+            .padding(.horizontal, 16)
+            .background(AppTheme.surface)
+            .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
+            .accessibilityElement(children: .combine)
+        } else {
             Button {
                 activeField = .end
             } label: {
@@ -98,29 +116,47 @@ struct DurationStep: View {
                 }
                 .foregroundStyle(activeField == .end ? .white : AppTheme.title)
                 .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-                .padding(.leading, 16)
+                .padding(.horizontal, 16)
+                .background(activeField == .end ? AppTheme.blue : AppTheme.surface)
+                .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
             }
             .buttonStyle(.plain)
-
-            Button {
-                activeField = .end
-                draft.setOngoing()
-            } label: {
-                Text("∞")
-                    .font(.title.bold())
-                    .foregroundStyle(draft.isOngoing ? .white : AppTheme.blue)
-                    .frame(width: 48, height: 48)
-                    .background(draft.isOngoing ? AppTheme.title : AppTheme.blueFill)
-                    .clipShape(.circle)
-            }
-            .accessibilityLabel("Ongoing, no end date")
-            .accessibilityValue(draft.isOngoing ? "Selected" : "")
-            .accessibilityIdentifier("duration.ongoing")
-            .padding(.trailing, 10)
         }
-        .background(activeField == .end ? AppTheme.blue : AppTheme.surface)
+    }
+
+    private var ongoingToggle: some View {
+        Toggle(isOn: ongoingBinding) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Take indefinitely", systemImage: "infinity")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.title)
+                Text("Keep this medication active with no planned end date.")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryText)
+            }
+        }
+        .tint(AppTheme.blue)
+        .padding(16)
+        .background(AppTheme.surface)
         .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
-        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("duration.ongoing")
+    }
+
+    private var ongoingBinding: Binding<Bool> {
+        Binding(
+            get: { draft.isOngoing },
+            set: { isOngoing in
+                if isOngoing {
+                    activeField = .start
+                    draft.setOngoing()
+                } else {
+                    activeField = .end
+                    draft.isOngoing = false
+                    draft.durationValue = max(1, draft.durationValue)
+                    draft.updateEndDateFromDuration()
+                }
+            }
+        )
     }
 
     private var durationStepper: some View {
@@ -179,7 +215,7 @@ struct DurationStep: View {
             return "This medication has no planned end date."
         }
         guard let endDate = draft.endDate else {
-            return "Choose an end date or use ∞ for an ongoing medication."
+            return "Choose an end date or turn on Take indefinitely for an ongoing medication."
         }
         return "From \(draft.startDate.shortMedicationDate) to \(endDate.shortMedicationDate). Adding 7 Days ends seven calendar days after the start date."
     }

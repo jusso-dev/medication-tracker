@@ -180,10 +180,11 @@ struct MedicationDataStoreTests {
         defer { try? FileManager.default.removeItem(at: storeDirectory) }
 
         let storeURL = storeDirectory.appendingPathComponent("MedicationTracker.store")
+        let scannedImageData = Data([0xFF, 0xD8, 0xFF, 0xD9])
         let scan = MedicationOCRService.parse(lines: [
             "AMOXICILLIN 500 mg",
             "EXP 08/2027"
-        ])
+        ], scannedImageData: scannedImageData)
 
         do {
             let container = try MedicationDataStore.makeContainer(
@@ -205,5 +206,6 @@ struct MedicationDataStoreTests {
         #expect(medicine.amount == 500)
         #expect(medicine.unit == .mg)
         #expect(medicine.packageExpiryDate != nil)
+        #expect(medicine.scannedImageData == scannedImageData)
     }
 }

@@ -1,4 +1,6 @@
 import Foundation
+import ImageIO
+import UIKit
 import Vision
 
 struct MedicationScanResult: Sendable {
@@ -12,6 +14,7 @@ struct MedicationScanResult: Sendable {
     let prescriber: String?
     let rawText: String
     let confidence: Float
+    let scannedImageData: Data?
 }
 
 actor MedicationOCRService {
@@ -43,14 +46,16 @@ actor MedicationOCRService {
             lines: lines,
             confidence: confidences.isEmpty
                 ? 0
-                : confidences.reduce(0, +) / Float(confidences.count)
+                : confidences.reduce(0, +) / Float(confidences.count),
+            scannedImageData: Self.preparedScanImage(from: imageData.first)
         )
     }
 
     nonisolated static func parse(
         lines: [String],
         confidence: Float = 1,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        scannedImageData: Data? = nil
     ) -> MedicationScanResult {
         let rawText = lines.joined(separator: "\n")
         let catalogueMatch = AustralianMedicineCatalogue.match(in: rawText)
@@ -86,8 +91,30 @@ actor MedicationOCRService {
                 in: rawText
             )?.trimmingCharacters(in: .whitespacesAndNewlines).capitalized,
             rawText: rawText,
-            confidence: confidence
+            confidence: confidence,
+            scannedImageData: scannedImageData
         )
+    }
+
+    nonisolated private static func preparedScanImage(from data: Data?) -> Data? {
+        guard let data,
+              let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return nil
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1_800
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            options as CFDictionary
+        ) else {
+            return nil
+        }
+        return UIImage(cgImage: image).jpegData(compressionQuality: 0.78)
     }
 
     nonisolated private static func parseDose(

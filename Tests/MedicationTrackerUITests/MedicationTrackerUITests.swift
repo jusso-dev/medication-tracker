@@ -48,7 +48,7 @@ final class MedicationTrackerUITests: XCTestCase {
         app.buttons["wizard.next"].tap()
 
         XCTAssertTrue(app.staticTexts["How long will you take it?"].waitForExistence(timeout: 3))
-        app.buttons["duration.ongoing"].tap()
+        app.switches["duration.ongoing"].tap()
         app.buttons["wizard.save"].tap()
 
         XCTAssertTrue(app.staticTexts["Ibuprofen"].waitForExistence(timeout: 5))
@@ -124,6 +124,7 @@ final class MedicationTrackerUITests: XCTestCase {
         let useScan = app.buttons["scan.use"]
         XCTAssertTrue(useScan.waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Amoxicillin"].exists)
+        XCTAssertTrue(app.images["Scanned medication image"].exists)
         useScan.tap()
 
         XCTAssertTrue(app.staticTexts["Set your dosage"].waitForExistence(timeout: 3))
@@ -136,11 +137,14 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(
             app.staticTexts["How long will you take it?"].waitForExistence(timeout: 3)
         )
-        app.buttons["duration.ongoing"].tap()
+        app.switches["duration.ongoing"].tap()
         app.buttons["wizard.save"].tap()
 
         XCTAssertTrue(app.staticTexts["Amoxicillin"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["500 mg"].exists)
+        app.staticTexts["Amoxicillin"].tap()
+        XCTAssertTrue(app.staticTexts["Scanned label"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.images["Scanned medication image"].exists)
     }
 
     func testScheduledMedicineSelectsAllDaysAndContinues() {
@@ -157,7 +161,11 @@ final class MedicationTrackerUITests: XCTestCase {
         app.buttons["wizard.next"].tap()
 
         XCTAssertTrue(app.staticTexts["Set your dosage"].waitForExistence(timeout: 3))
+        app.buttons["dose.unit.mg"].tap()
         app.buttons["dose.key.1"].tap()
+        app.buttons["dose.key.2"].tap()
+        app.buttons["dose.key.decimal"].tap()
+        app.buttons["dose.key.5"].tap()
         app.buttons["wizard.next"].tap()
 
         XCTAssertTrue(app.staticTexts["Any schedule?"].waitForExistence(timeout: 3))
@@ -167,10 +175,39 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(addTime.waitForExistence(timeout: 3))
 
         addTime.tap()
+        let timeSlider = app.descendants(matching: .any)["schedule.time-slider"]
+        XCTAssertTrue(timeSlider.waitForExistence(timeout: 3))
+        let timeLabel = app.staticTexts["schedule.time-label"].firstMatch
+        let initialTimeLabel = timeLabel.label
+        let dragStart = timeSlider.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        let dragEnd = timeSlider.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
+        dragStart.press(forDuration: 0.1, thenDragTo: dragEnd)
+        XCTAssertNotEqual(timeLabel.label, initialTimeLabel)
         app.buttons["wizard.next"].tap()
         XCTAssertTrue(
             app.staticTexts["How long will you take it?"].waitForExistence(timeout: 3)
         )
+        XCTAssertTrue(app.staticTexts["Take indefinitely"].exists)
+        app.switches["duration.ongoing"].tap()
+        app.buttons["wizard.save"].tap()
+
+        XCTAssertTrue(app.staticTexts["Test Medicine"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["12.5 mg"].exists)
+    }
+
+    func testNewUserCompletesCleanOnboarding() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--ui-testing-onboarding"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Know what to take"].waitForExistence(timeout: 3))
+        app.buttons["onboarding.continue"].tap()
+        XCTAssertTrue(app.staticTexts["Scan, then confirm"].waitForExistence(timeout: 3))
+        app.buttons["onboarding.continue"].tap()
+        XCTAssertTrue(app.staticTexts["Keep your data safe"].waitForExistence(timeout: 3))
+        app.buttons["onboarding.complete"].tap()
+
+        XCTAssertTrue(app.staticTexts["Medications Catalog"].waitForExistence(timeout: 5))
     }
 
     func testSeededDataWalksCatalogDetailsTodayAndHistory() {
@@ -245,6 +282,13 @@ final class MedicationTrackerUITests: XCTestCase {
         ]
         let scrollView = app.scrollViews.firstMatch
         XCTAssertTrue(scrollView.waitForExistence(timeout: 3))
+
+        let createBackup = app.buttons["backup.create"]
+        for _ in 0..<4 where !createBackup.isHittable {
+            scrollView.swipeUp()
+        }
+        XCTAssertTrue(createBackup.isHittable)
+        XCTAssertTrue(app.buttons["backup.restore"].exists)
 
         let careShare = app.buttons["care-share.settings"]
         for _ in 0..<4 where !careShare.isHittable {

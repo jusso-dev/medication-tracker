@@ -18,17 +18,18 @@ The checked-in Xcode project has one iOS app target, one unit-test target, and o
 3. Select the `MedicationTracker` scheme and an iPhone simulator.
 4. Press **Run** (`⌘R`).
 
-The app opens on an empty Medications Catalog. Use `+` to add a medicine or treatment plan. Notification permission is requested only when reminders are turned on.
+New users see a short onboarding flow before the empty Medications Catalog. Use `+` to add a medicine or treatment plan. Notification permission is requested only when reminders are turned on.
 
 ## Features
 
 - Four-tab interface: History, Today, Medications, and Settings
 - Scheduled and as-needed medication setup
 - Offline Australian medicine-name lookup with common brand names
-- On-device OCR for medicine labels and prescriptions, with camera and photo input
-- Daily and every-other-day presets, linked 8-hour/12-hour times, and custom times
+- On-device OCR for medicine labels and prescriptions, with camera and photo input and an optional saved label image
+- Daily and every-other-day presets, linked 8-hour/12-hour times, and always-visible custom time sliders
 - One-tap all-days selection, clear-dose input, and guided schedule validation
-- Finite or ongoing durations
+- Whole, fractional, and decimal strengths such as 12.5 mg
+- Finite or explicitly indefinite durations
 - Treatment plans with optional prescriber
 - Take, skip, snooze, take-late, and as-needed dose logging
 - Local notification actions for Take, Skip, and Snooze
@@ -37,6 +38,7 @@ The app opens on an empty Medications Catalog. Use `+` to add a medicine or trea
 - One-time, privacy-controlled care snapshots shared through the iOS share sheet
 - Completion history and medication restart
 - Optional Face ID/device-passcode app lock
+- Full local backup and confirmed restore for medicines, images, plans, scripts, and dose history
 - Dynamic Type, VoiceOver labels, and 44-point minimum controls
 
 Dose times are stored as wall-clock times. Existing times are not converted when the phone’s time zone changes.
@@ -57,7 +59,7 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-The test suite covers schedule/duration calculations, OCR parsing, Australian brand lookup, refill-script status and persistence, daily caps, inventory/refill behaviour, Settings scrolling, and end-to-end medicine and treatment-plan flows.
+The test suite covers schedule/duration calculations, OCR parsing and scan-image persistence, Australian brand lookup, full backup/restore, refill-script status and persistence, decimal doses, daily caps, inventory/refill behaviour, onboarding, Settings scrolling, and end-to-end medicine and treatment-plan flows.
 
 If you edit `project.yml`, regenerate the project first with:
 

@@ -18,6 +18,7 @@ final class Medicine {
     var endDay: CalendarDay?
     var remindersOn: Bool
     var notes: String?
+    @Attribute(.externalStorage) var scannedImageData: Data?
     @Attribute(originalName: "packageExpiryDate")
     var legacyPackageExpiryDate: Date?
     var packageExpiryDay: CalendarDay?
@@ -97,6 +98,7 @@ final class Medicine {
         endDate: Date? = nil,
         remindersOn: Bool = false,
         notes: String? = nil,
+        scannedImageData: Data? = nil,
         packageExpiryDate: Date? = nil,
         dailyCap: Int? = nil,
         quantityRemaining: Decimal? = nil,
@@ -119,6 +121,7 @@ final class Medicine {
         self.endDay = endDate.map { CalendarDay($0) }
         self.remindersOn = remindersOn
         self.notes = notes?.nilIfBlank
+        self.scannedImageData = scannedImageData
         self.legacyPackageExpiryDate = nil
         self.packageExpiryDay = packageExpiryDate.map { CalendarDay($0) }
         self.dailyCap = dailyCap

@@ -7,7 +7,6 @@ struct ScheduleStep: View {
     @Bindable var draft: MedicineDraft
     @Binding var validationMessage: String?
 
-    @State private var expandedTime: Int?
     @AccessibilityFocusState private var validationIsFocused: Bool
 
     var body: some View {
@@ -111,10 +110,7 @@ struct ScheduleStep: View {
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        draft.cycleTimePreset()
-                        expandedTime = nil
-                    }
+                    draft.cycleTimePreset()
                 } label: {
                     HStack(spacing: 5) {
                         if draft.intervalLinked {
@@ -128,48 +124,29 @@ struct ScheduleStep: View {
                 .minimumTapTarget()
             }
 
-            ForEach(draft.times, id: \.self) { minutes in
+            ForEach(draft.timeEntries) { entry in
                 VStack(spacing: 8) {
                     HStack {
                         Button {
-                            draft.removeTime(minutes)
-                            if expandedTime == minutes {
-                                expandedTime = nil
-                            }
+                            draft.removeTime(id: entry.id)
                         } label: {
                             Image(systemName: "trash")
                                 .foregroundStyle(AppTheme.red)
                                 .minimumTapTarget()
                         }
-                        .accessibilityLabel("Delete \(minutes.medicationTime)")
+                        .accessibilityLabel("Delete \(currentMinutes(for: entry).medicationTime)")
 
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                expandedTime = expandedTime == minutes ? nil : minutes
-                            }
-                        } label: {
-                            HStack {
-                                Text(minutes.medicationTime)
-                                    .font(.headline)
-                                    .foregroundStyle(AppTheme.title)
-                                Spacer()
-                                Image(systemName: expandedTime == minutes ? "chevron.up" : "chevron.right")
-                                    .foregroundStyle(AppTheme.secondaryText)
-                            }
-                            .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Adjust \(minutes.medicationTime)")
-                        .accessibilityValue(expandedTime == minutes ? "Expanded" : "Collapsed")
+                        Text(currentMinutes(for: entry).medicationTime)
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.title)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .accessibilityIdentifier("schedule.time-label")
                     }
 
-                    if expandedTime == minutes {
-                        timeSlider(for: minutes)
-                            .transition(.opacity)
-                    }
+                    timeSlider(for: entry)
                 }
 
-                if minutes != draft.times.last {
+                if entry.id != draft.timeEntries.last?.id {
                     Divider()
                 }
             }
@@ -275,25 +252,27 @@ struct ScheduleStep: View {
         )
     }
 
-    private func timeSlider(for minutes: Int) -> some View {
+    private func timeSlider(for entry: MedicineDraftTime) -> some View {
         VStack(spacing: 6) {
             Slider(
                 value: Binding(
-                    get: { Double(expandedTime ?? minutes) },
+                    get: { Double(currentMinutes(for: entry)) },
                     set: { value in
-                        let adjusted = min(1_435, max(0, Int(value / 15) * 15))
-                        let oldValue = expandedTime ?? minutes
-                        if draft.updateTime(from: oldValue, to: adjusted) {
-                            expandedTime = adjusted
-                        }
+                        let adjusted = min(
+                            1_425,
+                            max(0, Int((value / 15).rounded()) * 15)
+                        )
+                        _ = draft.updateTime(id: entry.id, to: adjusted)
                     }
                 ),
-                in: 0...1_435,
+                in: 0...1_425,
                 step: 15
             )
             .tint(AppTheme.blue)
+            .accessibilityElement()
             .accessibilityLabel("Time")
-            .accessibilityValue((expandedTime ?? minutes).medicationTime)
+            .accessibilityValue(currentMinutes(for: entry).medicationTime)
+            .accessibilityIdentifier("schedule.time-slider")
 
             HStack {
                 Text("12 a.m.")
@@ -305,5 +284,9 @@ struct ScheduleStep: View {
             .font(.caption2)
             .foregroundStyle(AppTheme.secondaryText)
         }
+    }
+
+    private func currentMinutes(for entry: MedicineDraftTime) -> Int {
+        draft.time(for: entry.id) ?? entry.minutes
     }
 }

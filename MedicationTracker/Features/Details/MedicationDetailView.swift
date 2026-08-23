@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct MedicationDetailView: View {
     @Environment(\.dismiss) private var dismiss
@@ -26,6 +27,12 @@ struct MedicationDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
+
+                    if let imageData = medicine.scannedImageData,
+                       let image = UIImage(data: imageData) {
+                        scannedLabelImage(image)
+                    }
+
                     dailyIntake
 
                     if !medicine.asNeeded {
@@ -147,10 +154,26 @@ struct MedicationDetailView: View {
                 if let endDate = medicine.endDate {
                     Label(endDate.shortMedicationDate, systemImage: "stop.fill")
                 } else {
-                    Label("∞", systemImage: "stop.fill")
+                    Label("Ongoing — no end date", systemImage: "infinity")
                 }
             }
             .font(.headline)
+        }
+    }
+
+    private func scannedLabelImage(_ image: UIImage) -> some View {
+        DetailLabelRow("Scanned label", symbol: "doc.viewfinder") {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 260)
+                    .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
+                    .accessibilityLabel("Scanned medication image")
+                Text("Saved on this device with the medication record.")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryText)
+            }
         }
     }
 
