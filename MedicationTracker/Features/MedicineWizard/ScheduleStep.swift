@@ -7,7 +7,7 @@ struct ScheduleStep: View {
     @Bindable var draft: MedicineDraft
     @Binding var validationMessage: String?
 
-    @State private var expandedTime: Int?
+    @State private var expandedTime: UUID?
     @AccessibilityFocusState private var validationIsFocused: Bool
 
     var body: some View {
@@ -28,7 +28,7 @@ struct ScheduleStep: View {
             .onChange(of: draft.daysOfWeek) {
                 refreshValidationMessage()
             }
-            .onChange(of: draft.times) {
+            .onChange(of: draft.scheduledTimes) {
                 refreshValidationMessage()
             }
             .onChange(of: validationMessage) { _, message in
@@ -128,12 +128,12 @@ struct ScheduleStep: View {
                 .minimumTapTarget()
             }
 
-            ForEach(draft.times, id: \.self) { minutes in
+            ForEach(draft.scheduledTimes) { time in
                 VStack(spacing: 8) {
                     HStack {
                         Button {
-                            draft.removeTime(minutes)
-                            if expandedTime == minutes {
+                            draft.removeTime(id: time.id)
+                            if expandedTime == time.id {
                                 expandedTime = nil
                             }
                         } label: {
@@ -141,35 +141,35 @@ struct ScheduleStep: View {
                                 .foregroundStyle(AppTheme.red)
                                 .minimumTapTarget()
                         }
-                        .accessibilityLabel("Delete \(minutes.medicationTime)")
+                        .accessibilityLabel("Delete \(time.minutes.medicationTime)")
 
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
-                                expandedTime = expandedTime == minutes ? nil : minutes
+                                expandedTime = expandedTime == time.id ? nil : time.id
                             }
                         } label: {
                             HStack {
-                                Text(minutes.medicationTime)
+                                Text(time.minutes.medicationTime)
                                     .font(.headline)
                                     .foregroundStyle(AppTheme.title)
                                 Spacer()
-                                Image(systemName: expandedTime == minutes ? "chevron.up" : "chevron.right")
+                                Image(systemName: expandedTime == time.id ? "chevron.up" : "chevron.right")
                                     .foregroundStyle(AppTheme.secondaryText)
                             }
                             .frame(minHeight: 44)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Adjust \(minutes.medicationTime)")
-                        .accessibilityValue(expandedTime == minutes ? "Expanded" : "Collapsed")
+                        .accessibilityLabel("Adjust \(time.minutes.medicationTime)")
+                        .accessibilityValue(expandedTime == time.id ? "Expanded" : "Collapsed")
                     }
 
-                    if expandedTime == minutes {
-                        timeSlider(for: minutes)
+                    if expandedTime == time.id {
+                        timeSlider(for: time)
                             .transition(.opacity)
                     }
                 }
 
-                if minutes != draft.times.last {
+                if time.id != draft.scheduledTimes.last?.id {
                     Divider()
                 }
             }
@@ -275,17 +275,15 @@ struct ScheduleStep: View {
         )
     }
 
-    private func timeSlider(for minutes: Int) -> some View {
-        VStack(spacing: 6) {
+    private func timeSlider(for time: ScheduledTime) -> some View {
+        let minutes = draft.scheduledTimes.first(where: { $0.id == time.id })?.minutes ?? time.minutes
+        return VStack(spacing: 6) {
             Slider(
                 value: Binding(
-                    get: { Double(expandedTime ?? minutes) },
+                    get: { Double(minutes) },
                     set: { value in
                         let adjusted = min(1_435, max(0, Int(value / 15) * 15))
-                        let oldValue = expandedTime ?? minutes
-                        if draft.updateTime(from: oldValue, to: adjusted) {
-                            expandedTime = adjusted
-                        }
+                        _ = draft.updateTime(id: time.id, to: adjusted)
                     }
                 ),
                 in: 0...1_435,
@@ -293,7 +291,7 @@ struct ScheduleStep: View {
             )
             .tint(AppTheme.blue)
             .accessibilityLabel("Time")
-            .accessibilityValue((expandedTime ?? minutes).medicationTime)
+            .accessibilityValue(minutes.medicationTime)
 
             HStack {
                 Text("12 a.m.")
