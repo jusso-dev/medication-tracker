@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
+import UIKit
 @testable import MedicationTracker
 
 @MainActor
@@ -33,5 +34,23 @@ struct MedicineWizardTests {
         #expect(medicine.amount == Decimal(string: "12.5"))
         #expect(medicine.strengthText == "12.5 mg")
         #expect(medicine.endDate == nil)
+    }
+
+    @Test("Retrospective medication images are prepared for local storage")
+    func retrospectiveMedicationImagePreparation() throws {
+        let sourceData = UIGraphicsImageRenderer(
+            size: CGSize(width: 2_400, height: 1_600)
+        ).jpegData(withCompressionQuality: 1) { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2_400, height: 1_600))
+        }
+
+        let storedData = try #require(
+            MedicationOCRService.preparedStoredImage(from: sourceData)
+        )
+        let storedImage = try #require(UIImage(data: storedData))
+
+        #expect(max(storedImage.size.width, storedImage.size.height) <= 1_800)
+        #expect(MedicationOCRService.preparedStoredImage(from: Data()) == nil)
     }
 }

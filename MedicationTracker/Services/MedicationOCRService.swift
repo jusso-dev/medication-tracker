@@ -47,7 +47,7 @@ actor MedicationOCRService {
             confidence: confidences.isEmpty
                 ? 0
                 : confidences.reduce(0, +) / Float(confidences.count),
-            scannedImageData: Self.preparedScanImage(from: imageData.first)
+            scannedImageData: Self.preparedStoredImage(from: imageData.first)
         )
     }
 
@@ -96,9 +96,11 @@ actor MedicationOCRService {
         )
     }
 
-    nonisolated private static func preparedScanImage(from data: Data?) -> Data? {
+    nonisolated static func preparedStoredImage(from data: Data?) -> Data? {
         guard let data,
-              let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetStatus(source) == .statusComplete,
+              CGImageSourceGetCount(source) > 0 else {
             return nil
         }
         let options: [CFString: Any] = [

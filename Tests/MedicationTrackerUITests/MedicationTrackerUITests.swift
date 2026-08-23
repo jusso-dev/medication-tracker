@@ -143,8 +143,21 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Amoxicillin"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["500 mg"].exists)
         app.staticTexts["Amoxicillin"].tap()
-        XCTAssertTrue(app.staticTexts["Scanned label"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.images["Scanned medication image"].exists)
+        XCTAssertTrue(app.staticTexts["Medication image"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.images["medication.image"].exists)
+        XCTAssertTrue(app.buttons["medication.image.replace"].exists)
+        let removeImage = app.buttons["medication.image.remove"]
+        XCTAssertTrue(removeImage.exists)
+        removeImage.tap()
+
+        let removeAlert = app.alerts["Remove medication image?"]
+        XCTAssertTrue(removeAlert.waitForExistence(timeout: 3))
+        removeAlert.buttons["Remove"].tap()
+        XCTAssertTrue(app.buttons["medication.image.add"].waitForExistence(timeout: 3))
+
+        app.buttons["Close"].firstMatch.tap()
+        app.staticTexts["Amoxicillin"].tap()
+        XCTAssertTrue(app.buttons["medication.image.add"].waitForExistence(timeout: 3))
     }
 
     func testScheduledMedicineSelectsAllDaysAndContinues() {
@@ -224,6 +237,7 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Weekly schedule"].exists)
         XCTAssertTrue(app.staticTexts["Package expiry"].exists)
         XCTAssertTrue(app.staticTexts["Refill Scripts"].exists)
+        XCTAssertTrue(app.buttons["medication.image.add"].exists)
 
         app.buttons["refill.script.RX-TEST"].tap()
         XCTAssertTrue(app.staticTexts["Refill Script"].waitForExistence(timeout: 3))
