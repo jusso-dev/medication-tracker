@@ -1,4 +1,6 @@
 import Foundation
+import ImageIO
+import UIKit
 import Vision
 
 actor MedicationOCRService {
@@ -26,23 +28,20 @@ actor MedicationOCRService {
             }
         }
 
-        var result = Self.parse(
+        return Self.parse(
             lines: lines,
             confidence: confidences.isEmpty
                 ? 0
-                : confidences.reduce(0, +) / Float(confidences.count)
+                : confidences.reduce(0, +) / Float(confidences.count),
+            scannedImageData: Self.preparedStoredImage(from: imageData.first)
         )
-        result.imageData = imageData.first
-        if let first = imageData.first {
-            result.imageFileExtension = ScanImageStore.fileExtension(for: first)
-        }
-        return result
     }
 
     nonisolated static func parse(
         lines: [String],
         confidence: Float = 1,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        scannedImageData: Data? = nil
     ) -> MedicationScanResult {
         let rawText = lines.joined(separator: "\n")
         let catalogueMatch = AustralianMedicineCatalogue.match(in: rawText)
@@ -74,12 +73,36 @@ actor MedicationOCRService {
                 in: rawText
             ),
             prescriber: capture(
-                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\\-]{2,40})"#,
+                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\-]{2,40})"#,
                 in: rawText
             )?.trimmingCharacters(in: .whitespacesAndNewlines).capitalized,
             rawText: rawText,
-            confidence: confidence
+            confidence: confidence,
+            scannedImageData: scannedImageData
         )
+    }
+
+    nonisolated static func preparedStoredImage(from data: Data?) -> Data? {
+        guard let data,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetStatus(source) == .statusComplete,
+              CGImageSourceGetCount(source) > 0 else {
+            return nil
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1_800
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            options as CFDictionary
+        ) else {
+            return nil
+        }
+        return UIImage(cgImage: image).jpegData(compressionQuality: 0.78)
     }
 
     nonisolated private static func parseDose(
@@ -275,23 +298,23 @@ actor MedicationOCRService {
             return nil
         }
         let unsafeLabelPatterns = [
-            #"\\bEXP\\b"#, #"\\bEXPIRY\\b"#, #"\\bUSE\\s+BY\\b"#,
-            #"\\bBATCH\\b"#, #"\\bLOT\\b"#, #"\\bSCRIPT\\b"#, #"\\bREPEATS?\\b"#,
-            #"\\bPATIENT\\b"#, #"\\bPHARMACY\\b"#, #"\\bPRESCRIBER\\b"#,
-            #"\\bDOCTOR\\b"#, #"\\bTAKE\\b"#, #"\\bGIVE\\b"#, #"\\bDOSE\\b"#,
-            #"\\bUSE\\b"#
+            #"\bEXP\b"#, #"\bEXPIRY\b"#, #"\bUSE\s+BY\b"#,
+            #"\bBATCH\b"#, #"\bLOT\b"#, #"\bSCRIPT\b"#, #"\bREPEATS?\b"#,
+            #"\bPATIENT\b"#, #"\bPHARMACY\b"#, #"\bPRESCRIBER\b"#,
+            #"\bDOCTOR\b"#, #"\bTAKE\b"#, #"\bGIVE\b"#, #"\bDOSE\b"#,
+            #"\bUSE\b"#
         ]
         let strengthLine = lines[strengthLineIndex]
         let upper = strengthLine.uppercased()
         if !containsAnyPattern(unsafeLabelPatterns, in: upper) {
             let cleaned = strengthLine
                 .replacingOccurrences(
-                    of: #"\\d+(?:[.,]\\d+)?\\s*(?:MG|G)(?:\\s*(?:/|PER)\\s*(?:\\d+(?:[.,]\\d+)?\\s*)?ML)?"#,
+                    of: #"\d+(?:[.,]\d+)?\s*(?:MG|G)(?:\s*(?:/|PER)\s*(?:\d+(?:[.,]\d+)?\s*)?ML)?"#,
                     with: "",
                     options: [.regularExpression, .caseInsensitive]
                 )
                 .replacingOccurrences(
-                    of: #"\\b(?:TABLETS?|CAPSULES?|ORAL|SOLUTION|SUSPENSION)\\b"#,
+                    of: #"\b(?:TABLETS?|CAPSULES?|ORAL|SOLUTION|SUSPENSION)\b"#,
                     with: "",
                     options: [.regularExpression, .caseInsensitive]
                 )
@@ -304,8 +327,8 @@ actor MedicationOCRService {
         }
 
         let excludedPatterns = unsafeLabelPatterns + [
-            #"\\bTABLETS?\\b"#, #"\\bCAPSULES?\\b"#, #"\\bORAL\\b"#,
-            #"\\bSOLUTION\\b"#, #"\\bSUSPENSION\\b"#
+            #"\bTABLETS?\b"#, #"\bCAPSULES?\b"#, #"\bORAL\b"#,
+            #"\bSOLUTION\b"#, #"\bSUSPENSION\b"#
         ]
         let adjacentIndices = [strengthLineIndex - 1, strengthLineIndex + 1]
         for index in adjacentIndices where lines.indices.contains(index) {
