@@ -509,4 +509,6 @@ enum SettingsKeys {
     static let reminderLeadTime = "reminderLeadTime"
     static let snoozeMinutes = "snoozeMinutes"
     static let appLockEnabled = "appLockEnabled"
+    static let hasCompletedOnboarding = "hasCompletedOnboarding"
+    static let lastBackupAt = "lastBackupAt"
 }
