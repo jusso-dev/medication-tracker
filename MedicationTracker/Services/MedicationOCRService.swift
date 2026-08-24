@@ -3,6 +3,20 @@ import ImageIO
 import UIKit
 import Vision
 
+struct MedicationScanResult: Sendable {
+    let medicineName: String?
+    let amount: Decimal?
+    let unit: MedicineUnit?
+    let expiryDate: Date?
+    let repeatsRemaining: Int?
+    let repeatsAuthorised: Int?
+    let scriptNumber: String?
+    let prescriber: String?
+    let rawText: String
+    let confidence: Float
+    let scannedImageData: Data?
+}
+
 actor MedicationOCRService {
     func scan(imageData: [Data]) throws -> MedicationScanResult {
         var lines: [String] = []
@@ -73,7 +87,7 @@ actor MedicationOCRService {
                 in: rawText
             ),
             prescriber: capture(
-                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\-]{2,40})"#,
+                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\\-]{2,40})"#,
                 in: rawText
             )?.trimmingCharacters(in: .whitespacesAndNewlines).capitalized,
             rawText: rawText,
