@@ -11,11 +11,11 @@ struct MedicineWizardTests {
     func timeEntryIdentityIsStable() {
         let draft = MedicineDraft()
         draft.addTime()
-        let entry = draft.scheduledTimes[0]
+        let entry = draft.timeEntries[0]
 
         #expect(draft.updateTime(id: entry.id, to: 1_080))
-        #expect(draft.scheduledTimes[0].id == entry.id)
-        #expect(draft.scheduledTimes[0].minutes == 1_080)
+        #expect(draft.timeEntries[0].id == entry.id)
+        #expect(draft.timeEntries[0].minutes == 1_080)
     }
 
     @Test("Decimal half strengths save as an ongoing medication")
