@@ -151,6 +151,7 @@ struct HistoryView: View {
             endDate: newEnd,
             remindersOn: medicine.remindersOn,
             notes: medicine.notes,
+            scannedImageData: medicine.scannedImageData,
             packageExpiryDate: medicine.packageExpiryDate,
             dailyCap: medicine.dailyCap,
             quantityRemaining: medicine.quantityRemaining,
