@@ -31,7 +31,7 @@ struct BackupMedicine: Codable, Sendable {
     var lowStockNotificationSent: Bool
     var statusRawValue: String
     var completedAt: Date?
-    var scanImageFileName: String?
+    var scannedImageDataBase64: String?
     var planID: UUID?
 
     init(_ medicine: Medicine) {
@@ -55,7 +55,7 @@ struct BackupMedicine: Codable, Sendable {
         lowStockNotificationSent = medicine.lowStockNotificationSent
         statusRawValue = medicine.statusRawValue
         completedAt = medicine.completedAt
-        scanImageFileName = medicine.scanImageFileName
+        scannedImageDataBase64 = medicine.scannedImageData?.base64EncodedString()
         planID = medicine.plan?.id
     }
 }

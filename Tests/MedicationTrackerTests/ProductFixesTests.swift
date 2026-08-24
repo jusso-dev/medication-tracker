@@ -6,35 +6,29 @@ import Testing
 @MainActor
 @Suite("Scan image persistence")
 struct ScanImagePersistenceTests {
-    @Test("applyScan and save keep image bytes on the sidecar")
+    @Test("applyScan and save keep image bytes on scannedImageData")
     func applyScanKeepsImageBytes() throws {
-        let store = try makeScanStore()
-        defer { try? FileManager.default.removeItem(at: store.directory) }
-
         let container = try makeContainer()
         let image = Data("scan-bytes".utf8)
-        var result = MedicationOCRService.parse(lines: [
-            "AMOXICILLIN 500 mg",
-            "EXP 08/2027"
-        ])
-        result.imageData = image
-        result.imageFileExtension = "jpg"
+        let result = MedicationOCRService.parse(
+            lines: [
+                "AMOXICILLIN 500 mg",
+                "EXP 08/2027"
+            ],
+            scannedImageData: image
+        )
 
         let draft = MedicineDraft()
         draft.applyScan(result)
         draft.setOngoing()
-        let medicine = try draft.save(
-            context: container.mainContext,
-            scanImageStore: store
-        )
+        let medicine = try draft.save(context: container.mainContext)
 
-        #expect(medicine.scanImageFileName == "\(medicine.id.uuidString).jpg")
-        #expect(medicine.scanImageData(store: store) == image)
+        #expect(medicine.scannedImageData == image)
 
         let edited = MedicineDraft(medicine: medicine)
-        #expect(edited.scanImageData == nil)
-        _ = try edited.save(context: container.mainContext, scanImageStore: store)
-        #expect(medicine.scanImageData(store: store) == image)
+        #expect(edited.scannedImageData == image)
+        _ = try edited.save(context: container.mainContext)
+        #expect(medicine.scannedImageData == image)
     }
 }
 
@@ -43,9 +37,6 @@ struct ScanImagePersistenceTests {
 struct BackupRestoreTests {
     @Test("export and import merge by id and keep scan images")
     func mergeByID() throws {
-        let store = try makeScanStore()
-        defer { try? FileManager.default.removeItem(at: store.directory) }
-
         let source = try makeContainer()
         let medicineID = UUID()
         let medicine = Medicine(
@@ -56,15 +47,13 @@ struct BackupRestoreTests {
             asNeeded: true,
             startDate: .now,
             notes: "Original",
-            scanImageFileName: "\(medicineID.uuidString).jpg"
+            scannedImageData: Data("page".utf8)
         )
         source.mainContext.insert(medicine)
-        try store.write(Data("page".utf8), medicineID: medicineID, fileExtension: "jpg")
         try source.mainContext.save()
 
         let archive = try BackupRestoreService.exportArchive(
-            context: source.mainContext,
-            scanImageStore: store
+            context: source.mainContext
         )
 
         let destination = try makeContainer()
@@ -91,8 +80,7 @@ struct BackupRestoreTests {
 
         try BackupRestoreService.importArchive(
             archive,
-            context: destination.mainContext,
-            scanImageStore: store
+            context: destination.mainContext
         )
 
         let medicines = try destination.mainContext.fetch(FetchDescriptor<Medicine>())
@@ -100,7 +88,7 @@ struct BackupRestoreTests {
         #expect(merged.name == "Amoxicillin")
         #expect(merged.notes == "Original")
         #expect(medicines.contains { $0.name == "Keep me" })
-        #expect(merged.scanImageData(store: store) == Data("page".utf8))
+        #expect(merged.scannedImageData == Data("page".utf8))
     }
 
     @Test("failed parse does not delete existing medicines")
@@ -156,12 +144,4 @@ private func makeContainer() throws -> ModelContainer {
         RefillScript.self,
         configurations: configuration
     )
-}
-
-@MainActor
-private func makeScanStore() throws -> ScanImageStore {
-    let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ScanImages-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    return ScanImageStore(directory: directory)
 }
