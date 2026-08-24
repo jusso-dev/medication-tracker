@@ -57,9 +57,6 @@ struct DosageStep: View {
     }
 
     private var amountSummary: String {
-        if let amount = draft.parsedAmount {
-            return "\(amount.medicationFormatted) \(draft.unit.displayName(for: amount))"
-        }
         guard !draft.amountText.isEmpty else {
             return "Amount \(draft.unit.displayName)"
         }
@@ -119,7 +116,11 @@ struct DosageStep: View {
                 }
 
                 keypadButton(".") {
-                    appendDecimal()
+                    if draft.amountText.isEmpty || fractions.contains(draft.amountText) {
+                        draft.amountText = "0."
+                    } else if !draft.amountText.contains(".") {
+                        draft.amountText.append(".")
+                    }
                 }
                 .accessibilityLabel("Decimal point")
                 .accessibilityIdentifier("dose.key.decimal")
@@ -138,6 +139,11 @@ struct DosageStep: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Delete last digit")
             }
+
+            Text("Use the decimal point for strengths such as 12.5 mg.")
+                .font(.footnote)
+                .foregroundStyle(AppTheme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
                 draft.amountText = ""
@@ -208,18 +214,6 @@ struct DosageStep: View {
         .padding(16)
         .background(AppTheme.surface)
         .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
-    }
-
-    private func appendDecimal() {
-        if fractions.contains(draft.amountText) || draft.amountText.isEmpty {
-            draft.amountText = "0."
-            return
-        }
-        guard !draft.amountText.contains("."),
-              !draft.amountText.contains(",") else {
-            return
-        }
-        draft.amountText.append(".")
     }
 
     private func keypadButton(
