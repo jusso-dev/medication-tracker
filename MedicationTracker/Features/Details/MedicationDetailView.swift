@@ -26,6 +26,7 @@ struct MedicationDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
+                    scanPhoto
                     dailyIntake
 
                     if !medicine.asNeeded {
@@ -105,6 +106,18 @@ struct MedicationDetailView: View {
                 .foregroundStyle(AppTheme.secondaryText)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var scanPhoto: some View {
+        if medicine.scanImageData != nil {
+            DetailLabelRow("Scanned label", symbol: "photo") {
+                ScanThumbnail(
+                    data: medicine.scanImageData,
+                    identifier: "detail.scan.thumbnail"
+                )
+            }
+        }
     }
 
     private var dailyIntake: some View {
