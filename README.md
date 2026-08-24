@@ -28,7 +28,7 @@ After that the app opens on the Medications Catalog. Use `+` to add a medicine o
 - Scheduled and as-needed medication setup
 - Offline Australian medicine-name lookup with common brand names
 - On-device OCR for medicine labels and prescriptions, with camera and photo input
-- The last scanned JPEG or PNG is kept under Application Support, keyed by medicine id, and shown on the scan result card and the medicine detail screen
+- The last scanned JPEG or PNG is stored on the medicine record (`scannedImageData`) and shown on the scan result card and the medicine detail screen. It is not a sidecar file
 - Daily and every-other-day presets, linked 8-hour/12-hour times, and custom times
 - One-tap all-days selection, clear-dose input, and guided schedule validation
 - Half doses: amounts store as `Decimal`. `12.5` and `12,5` both round-trip. The keypad has a decimal point and the amount summary shows 12.5 mg
@@ -38,7 +38,7 @@ After that the app opens on the Medications Catalog. Use `+` to add a medicine o
 - Local notification actions for Take, Skip, and Snooze
 - Optional notes, package expiry, daily cap, quantity remaining, and refill threshold
 - Refill-script review with explicit expiry, authorised/remaining repeats, and refill recording
-- Settings **Backup and restore**: export or import a `.medicationbackup` zip of medicines, plans, doses, refill scripts, and scan images. Restore is merge-by-id. A file that fails to parse is not applied, so existing data stays
+- Settings **Backup and restore**: export or import a `.medicationbackup` zip of medicines, plans, doses, refill scripts, and scan photos. Restore is merge-by-id. A file that fails to parse is not applied, so existing data stays
 - One-time, privacy-controlled care snapshots shared through the iOS share sheet (this is not the same as backup)
 - Completion history and medication restart
 - Optional Face ID/device-passcode app lock
