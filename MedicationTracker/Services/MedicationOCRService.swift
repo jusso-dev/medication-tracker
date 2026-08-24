@@ -87,7 +87,7 @@ actor MedicationOCRService {
                 in: rawText
             ),
             prescriber: capture(
-                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\\-]{2,40})"#,
+                matching: #"(?:PRESCRIBER|DOCTOR|DR\.?)\s*[:\-]?\s*([A-Z][A-Z .'\-]{2,40})"#,
                 in: rawText
             )?.trimmingCharacters(in: .whitespacesAndNewlines).capitalized,
             rawText: rawText,
