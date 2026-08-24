@@ -1,5 +1,7 @@
+import PhotosUI
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct MedicationDetailView: View {
     @Environment(\.dismiss) private var dismiss
@@ -14,6 +16,9 @@ struct MedicationDetailView: View {
     @State private var showingScriptEditor = false
     @State private var selectedScript: RefillScript?
     @State private var pendingAction: MedicationDetailAction?
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var isSavingImage = false
+    @State private var imageErrorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +31,9 @@ struct MedicationDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
-                    scanPhoto
+
+                    medicationImageSection
+
                     dailyIntake
 
                     if !medicine.asNeeded {
@@ -76,6 +83,10 @@ struct MedicationDetailView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
         }
+        .onChange(of: selectedImage) { _, item in
+            guard let item else { return }
+            importImage(item)
+        }
         .alert(item: $pendingAction) { action in
             switch action {
             case .delete:
@@ -92,7 +103,25 @@ struct MedicationDetailView: View {
                     primaryButton: .default(Text("Complete"), action: completeMedicine),
                     secondaryButton: .cancel()
                 )
+            case .removeImage:
+                Alert(
+                    title: Text("Remove medication image?"),
+                    message: Text("The medication record will remain unchanged."),
+                    primaryButton: .destructive(
+                        Text("Remove"),
+                        action: removeMedicationImage
+                    ),
+                    secondaryButton: .cancel()
+                )
             }
+        }
+        .alert("Image update failed", isPresented: Binding(
+            get: { imageErrorMessage != nil },
+            set: { if !$0 { imageErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(imageErrorMessage ?? "")
         }
     }
 
@@ -106,18 +135,6 @@ struct MedicationDetailView: View {
                 .foregroundStyle(AppTheme.secondaryText)
         }
         .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private var scanPhoto: some View {
-        if medicine.scannedImageData != nil {
-            DetailLabelRow("Scanned label", symbol: "photo") {
-                ScanThumbnail(
-                    data: medicine.scannedImageData,
-                    identifier: "detail.scan.thumbnail"
-                )
-            }
-        }
     }
 
     private var dailyIntake: some View {
@@ -160,10 +177,110 @@ struct MedicationDetailView: View {
                 if let endDate = medicine.endDate {
                     Label(endDate.shortMedicationDate, systemImage: "stop.fill")
                 } else {
-                    Label("∞", systemImage: "stop.fill")
+                    Label("Ongoing — no end date", systemImage: "infinity")
                 }
             }
             .font(.headline)
+        }
+    }
+
+    @ViewBuilder
+    private var medicationImageSection: some View {
+        if let imageData = medicine.scannedImageData,
+           let image = UIImage(data: imageData) {
+            medicationImageCard(image)
+        } else if !isReadOnly {
+            DetailLabelRow("Medication image", symbol: "photo") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Add a photo of the medication or its packaging for future reference.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.secondaryText)
+                    addImagePicker
+                    imageSavingIndicator
+                }
+            }
+        }
+    }
+
+    private func medicationImageCard(_ image: UIImage) -> some View {
+        DetailLabelRow("Medication image", symbol: "photo") {
+            VStack(alignment: .leading, spacing: 12) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 260)
+                    .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
+                    .accessibilityLabel("Medication image")
+                    .accessibilityIdentifier("medication.image")
+                Text("Saved on this device with the medication record.")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryText)
+
+                if !isReadOnly {
+                    ViewThatFits {
+                        HStack(spacing: 10) {
+                            replaceImagePicker
+                            removeImageButton
+                        }
+                        VStack(spacing: 10) {
+                            replaceImagePicker
+                            removeImageButton
+                        }
+                    }
+                    imageSavingIndicator
+                }
+            }
+        }
+    }
+
+    private var addImagePicker: some View {
+        PhotosPicker(selection: $selectedImage, matching: .images) {
+            Label("Add image", systemImage: "photo.badge.plus")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(AppTheme.blue)
+                .clipShape(.capsule)
+        }
+        .disabled(isSavingImage)
+        .accessibilityIdentifier("medication.image.add")
+    }
+
+    private var replaceImagePicker: some View {
+        PhotosPicker(selection: $selectedImage, matching: .images) {
+            Label("Replace image", systemImage: "photo.on.rectangle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.blue)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(AppTheme.blueFill)
+                .clipShape(.capsule)
+        }
+        .disabled(isSavingImage)
+        .accessibilityIdentifier("medication.image.replace")
+    }
+
+    private var removeImageButton: some View {
+        Button {
+            pendingAction = .removeImage
+        } label: {
+            Label("Remove image", systemImage: "trash")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.red)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(AppTheme.redFill)
+                .clipShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .disabled(isSavingImage)
+        .accessibilityIdentifier("medication.image.remove")
+    }
+
+    @ViewBuilder
+    private var imageSavingIndicator: some View {
+        if isSavingImage {
+            ProgressView("Saving image…")
+                .font(.footnote)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -312,11 +429,53 @@ struct MedicationDetailView: View {
         }
         dismiss()
     }
+
+    private func importImage(_ item: PhotosPickerItem) {
+        selectedImage = nil
+        isSavingImage = true
+
+        Task {
+            do {
+                guard let originalData = try await item.loadTransferable(type: Data.self),
+                      let storedData = await Task.detached(priority: .userInitiated, operation: {
+                          MedicationOCRService.preparedStoredImage(from: originalData)
+                      }).value else {
+                    isSavingImage = false
+                    imageErrorMessage = "The selected photo could not be loaded. Try another image."
+                    return
+                }
+
+                let previousData = medicine.scannedImageData
+                medicine.scannedImageData = storedData
+                do {
+                    try modelContext.save()
+                } catch {
+                    medicine.scannedImageData = previousData
+                    throw error
+                }
+            } catch {
+                imageErrorMessage = "The selected photo could not be saved. Try again."
+            }
+            isSavingImage = false
+        }
+    }
+
+    private func removeMedicationImage() {
+        let previousData = medicine.scannedImageData
+        medicine.scannedImageData = nil
+        do {
+            try modelContext.save()
+        } catch {
+            medicine.scannedImageData = previousData
+            imageErrorMessage = "The image could not be removed. Try again."
+        }
+    }
 }
 
 private enum MedicationDetailAction: String, Identifiable {
     case delete
     case complete
+    case removeImage
 
     var id: String { rawValue }
 }
