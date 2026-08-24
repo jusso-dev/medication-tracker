@@ -110,10 +110,10 @@ struct MedicationDetailView: View {
 
     @ViewBuilder
     private var scanPhoto: some View {
-        if medicine.scanImageData != nil {
+        if medicine.scannedImageData != nil {
             DetailLabelRow("Scanned label", symbol: "photo") {
                 ScanThumbnail(
-                    data: medicine.scanImageData,
+                    data: medicine.scannedImageData,
                     identifier: "detail.scan.thumbnail"
                 )
             }
