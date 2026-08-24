@@ -84,12 +84,6 @@ final class Medicine {
         times.sorted()
     }
 
-    /// Alias used by the product-fixes UI. Same bytes as `scannedImageData`.
-    var scanImageData: Data? {
-        get { scannedImageData }
-        set { scannedImageData = newValue }
-    }
-
     init(
         id: UUID = UUID(),
         name: String,
