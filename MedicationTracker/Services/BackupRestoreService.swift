@@ -10,8 +10,7 @@ enum BackupRestoreService {
 
     @MainActor
     static func exportArchive(
-        context: ModelContext,
-        scanImageStore: ScanImageStore = .shared
+        context: ModelContext
     ) throws -> Data {
         let medicines = try context.fetch(FetchDescriptor<Medicine>())
         let plans = try context.fetch(FetchDescriptor<TreatmentPlan>())
@@ -36,14 +35,8 @@ enum BackupRestoreService {
         zip.addFile(path: "manifest.json", data: manifestData)
 
         for medicine in medicines {
-            guard let fileName = medicine.scanImageFileName,
-                  let data = scanImageStore.read(
-                    medicineID: medicine.id,
-                    fileName: fileName
-                  ) else {
-                continue
-            }
-            zip.addFile(path: "images/\(fileName)", data: data)
+            guard let data = medicine.scannedImageData else { continue }
+            zip.addFile(path: "images/\(medicine.id.uuidString).jpg", data: data)
         }
 
         return zip.finalize()
@@ -52,8 +45,7 @@ enum BackupRestoreService {
     @MainActor
     static func importArchive(
         _ data: Data,
-        context: ModelContext,
-        scanImageStore: ScanImageStore = .shared
+        context: ModelContext
     ) throws {
         let files = try StoredZipArchive.unpack(data)
         guard let manifestData = files["manifest.json"] else {
@@ -67,15 +59,14 @@ enum BackupRestoreService {
             throw BackupRestoreError.unsupportedVersion
         }
 
-        try merge(manifest, images: files, context: context, scanImageStore: scanImageStore)
+        try merge(manifest, images: files, context: context)
     }
 
     @MainActor
     private static func merge(
         _ manifest: BackupManifest,
         images: [String: Data],
-        context: ModelContext,
-        scanImageStore: ScanImageStore
+        context: ModelContext
     ) throws {
         let existingMedicines = Dictionary(
             uniqueKeysWithValues: try context.fetch(FetchDescriptor<Medicine>()).map { ($0.id, $0) }
@@ -120,6 +111,7 @@ enum BackupRestoreService {
                 throw BackupRestoreError.invalidRecord
             }
             let plan = record.planID.flatMap { plansByID[$0] }
+            let imageData = imageData(for: record, images: images)
             if let medicine = medicinesByID[record.id] {
                 medicine.name = record.name
                 medicine.amount = record.amount
@@ -140,7 +132,7 @@ enum BackupRestoreService {
                 medicine.lowStockNotificationSent = record.lowStockNotificationSent
                 medicine.status = MedicineStatus(rawValue: record.statusRawValue) ?? medicine.status
                 medicine.completedAt = record.completedAt
-                medicine.scanImageFileName = record.scanImageFileName
+                medicine.scannedImageData = imageData
                 medicine.plan = plan
             } else {
                 let medicine = Medicine(
@@ -157,27 +149,18 @@ enum BackupRestoreService {
                     endDate: record.endDate?.date(),
                     remindersOn: record.remindersOn,
                     notes: record.notes,
+                    scannedImageData: imageData,
                     packageExpiryDate: record.packageExpiryDate?.date(),
                     dailyCap: record.dailyCap,
                     quantityRemaining: record.quantityRemaining,
                     refillAt: record.refillAt,
                     status: MedicineStatus(rawValue: record.statusRawValue) ?? .active,
-                    plan: plan,
-                    scanImageFileName: record.scanImageFileName
+                    plan: plan
                 )
                 medicine.lowStockNotificationSent = record.lowStockNotificationSent
                 medicine.completedAt = record.completedAt
                 context.insert(medicine)
                 medicinesByID[record.id] = medicine
-            }
-
-            if let fileName = record.scanImageFileName,
-               let image = images["images/\(fileName)"] {
-                _ = try scanImageStore.write(
-                    image,
-                    medicineID: record.id,
-                    fileExtension: (fileName as NSString).pathExtension
-                )
             }
         }
 
@@ -232,6 +215,20 @@ enum BackupRestoreService {
         }
 
         try context.save()
+    }
+
+    private static func imageData(
+        for record: BackupMedicine,
+        images: [String: Data]
+    ) -> Data? {
+        if let data = images["images/\(record.id.uuidString).jpg"] {
+            return data
+        }
+        if let encoded = record.scannedImageDataBase64,
+           let data = Data(base64Encoded: encoded) {
+            return data
+        }
+        return nil
     }
 }
 
