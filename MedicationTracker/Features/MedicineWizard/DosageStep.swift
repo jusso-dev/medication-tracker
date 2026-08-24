@@ -57,6 +57,9 @@ struct DosageStep: View {
     }
 
     private var amountSummary: String {
+        if let amount = draft.parsedAmount {
+            return "\(amount.medicationFormatted) \(draft.unit.displayName(for: amount))"
+        }
         guard !draft.amountText.isEmpty else {
             return "Amount \(draft.unit.displayName)"
         }
@@ -108,11 +111,18 @@ struct DosageStep: View {
                 }
 
                 keypadButton("0") {
-                    if draft.amountText != "0" {
+                    if fractions.contains(draft.amountText) {
+                        draft.amountText = "0"
+                    } else if draft.amountText != "0" {
                         draft.amountText.append("0")
                     }
                 }
-                .gridCellColumns(2)
+
+                keypadButton(".") {
+                    appendDecimal()
+                }
+                .accessibilityLabel("Decimal point")
+                .accessibilityIdentifier("dose.key.decimal")
 
                 Button {
                     if !draft.amountText.isEmpty {
@@ -198,6 +208,18 @@ struct DosageStep: View {
         .padding(16)
         .background(AppTheme.surface)
         .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
+    }
+
+    private func appendDecimal() {
+        if fractions.contains(draft.amountText) || draft.amountText.isEmpty {
+            draft.amountText = "0."
+            return
+        }
+        guard !draft.amountText.contains("."),
+              !draft.amountText.contains(",") else {
+            return
+        }
+        draft.amountText.append(".")
     }
 
     private func keypadButton(
