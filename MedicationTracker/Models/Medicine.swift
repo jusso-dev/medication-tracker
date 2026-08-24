@@ -18,6 +18,7 @@ final class Medicine {
     var endDay: CalendarDay?
     var remindersOn: Bool
     var notes: String?
+    @Attribute(.externalStorage) var scannedImageData: Data?
     @Attribute(originalName: "packageExpiryDate")
     var legacyPackageExpiryDate: Date?
     var packageExpiryDay: CalendarDay?
@@ -27,7 +28,6 @@ final class Medicine {
     var lowStockNotificationSent: Bool
     var statusRawValue: String
     var completedAt: Date?
-    var scanImageFileName: String?
     @Relationship(inverse: \TreatmentPlan.medicines) var plan: TreatmentPlan?
     @Relationship(deleteRule: .cascade, inverse: \DoseEvent.medicine)
     var doseEvents: [DoseEvent]
@@ -84,20 +84,10 @@ final class Medicine {
         times.sorted()
     }
 
-    var scanImageURL: URL? {
-        ScanImageStore.shared.url(for: id, fileName: scanImageFileName)
-    }
-
+    /// Alias used by the product-fixes UI. Same bytes as `scannedImageData`.
     var scanImageData: Data? {
-        ScanImageStore.shared.read(medicineID: id, fileName: scanImageFileName)
-    }
-
-    func scanImageURL(store: ScanImageStore) -> URL? {
-        store.url(for: id, fileName: scanImageFileName)
-    }
-
-    func scanImageData(store: ScanImageStore) -> Data? {
-        store.read(medicineID: id, fileName: scanImageFileName)
+        get { scannedImageData }
+        set { scannedImageData = newValue }
     }
 
     init(
@@ -114,13 +104,13 @@ final class Medicine {
         endDate: Date? = nil,
         remindersOn: Bool = false,
         notes: String? = nil,
+        scannedImageData: Data? = nil,
         packageExpiryDate: Date? = nil,
         dailyCap: Int? = nil,
         quantityRemaining: Decimal? = nil,
         refillAt: Decimal? = nil,
         status: MedicineStatus = .active,
-        plan: TreatmentPlan? = nil,
-        scanImageFileName: String? = nil
+        plan: TreatmentPlan? = nil
     ) {
         self.id = id
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -137,6 +127,7 @@ final class Medicine {
         self.endDay = endDate.map { CalendarDay($0) }
         self.remindersOn = remindersOn
         self.notes = notes?.nilIfBlank
+        self.scannedImageData = scannedImageData
         self.legacyPackageExpiryDate = nil
         self.packageExpiryDay = packageExpiryDate.map { CalendarDay($0) }
         self.dailyCap = dailyCap
@@ -144,7 +135,6 @@ final class Medicine {
         self.refillAt = refillAt
         self.lowStockNotificationSent = false
         self.statusRawValue = status.rawValue
-        self.scanImageFileName = scanImageFileName
         self.plan = plan
         self.doseEvents = []
         self.refillScripts = []
