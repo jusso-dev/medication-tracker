@@ -22,19 +22,23 @@ enum MedicationDataStore {
 
 @main
 struct MedicationTrackerApp: App {
-    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\scenePhase) private var scenePhase
 
     @State private var router = AppRouter.shared
     @State private var notificationManager = NotificationManager.shared
     @State private var appLock = AppLockService()
     @State private var careShareImportRouter = CareShareImportRouter.shared
+    @AppStorage(SettingsKeys.hasCompletedOnboarding)
+    private var hasCompletedOnboarding = false
 
     private let modelContainer: ModelContainer
     private let storeError: String?
+    private let skipOnboarding: Bool
 
     init() {
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             || ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        skipOnboarding = isTesting
         var launchError: String?
         let resolvedContainer: ModelContainer
 
@@ -83,10 +87,14 @@ struct MedicationTrackerApp: App {
         WindowGroup {
             ZStack {
                 if storeError == nil {
-                    MainTabView()
-                        .environment(router)
-                        .environment(notificationManager)
-                        .environment(appLock)
+                    if hasCompletedOnboarding || skipOnboarding {
+                        MainTabView()
+                            .environment(router)
+                            .environment(notificationManager)
+                            .environment(appLock)
+                    } else {
+                        OnboardingView()
+                    }
                 } else {
                     DataStoreErrorView()
                 }
@@ -135,7 +143,7 @@ struct MedicationTrackerApp: App {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.hidden)
             }
-            .alert("Couldn’t open care snapshot", isPresented: Binding(
+            .alert("Could not open care snapshot", isPresented: Binding(
                 get: { careShareImportRouter.errorMessage != nil },
                 set: { if !$0 { careShareImportRouter.errorMessage = nil } }
             )) {
