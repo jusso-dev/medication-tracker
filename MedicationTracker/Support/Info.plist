@@ -34,6 +34,18 @@
                 <string>dev.jusso.medicationtracker.care-snapshot</string>
             </array>
         </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Medication Tracker Backup</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>dev.jusso.medicationtracker.backup</string>
+            </array>
+        </dict>
     </array>
     <key>LSRequiresIPhoneOS</key>
     <true/>
@@ -63,6 +75,25 @@
                 </array>
                 <key>public.mime-type</key>
                 <string>application/vnd.jusso.medication-care+json</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeDescription</key>
+            <string>Medication Tracker Backup</string>
+            <key>UTTypeIdentifier</key>
+            <string>dev.jusso.medicationtracker.backup</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>medicationbackup</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/vnd.jusso.medication-backup</string>
             </dict>
         </dict>
     </array>
