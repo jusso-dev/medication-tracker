@@ -14,6 +14,11 @@ struct MedicationScanResult: Sendable {
     var imageData: Data?
     var imageFileExtension: String
 
+    var scannedImageData: Data? {
+        get { imageData }
+        set { imageData = newValue }
+    }
+
     init(
         medicineName: String?,
         amount: Decimal?,
@@ -26,6 +31,7 @@ struct MedicationScanResult: Sendable {
         rawText: String,
         confidence: Float,
         imageData: Data? = nil,
+        scannedImageData: Data? = nil,
         imageFileExtension: String = "jpg"
     ) {
         self.medicineName = medicineName
@@ -38,7 +44,7 @@ struct MedicationScanResult: Sendable {
         self.prescriber = prescriber
         self.rawText = rawText
         self.confidence = confidence
-        self.imageData = imageData
+        self.imageData = imageData ?? scannedImageData
         self.imageFileExtension = imageFileExtension
     }
 }
