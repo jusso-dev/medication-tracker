@@ -2,6 +2,16 @@ import Foundation
 import Observation
 import SwiftData
 
+struct MedicineDraftTime: Identifiable, Equatable {
+    let id: UUID
+    var minutes: Int
+
+    init(id: UUID = UUID(), minutes: Int) {
+        self.id = id
+        self.minutes = minutes
+    }
+}
+
 @MainActor
 @Observable
 final class MedicineDraft {
@@ -9,7 +19,7 @@ final class MedicineDraft {
     var amountText = ""
     var unit: MedicineUnit = .tablet
     var daysOfWeek: Set<Int> = []
-    var scheduledTimes: [ScheduledTime] = []
+    private(set) var timeEntries: [MedicineDraftTime] = []
     var intervalMinutes: Int?
     var intervalLinked = false
     var remindersOn = false
@@ -19,6 +29,7 @@ final class MedicineDraft {
     var durationUnit: DurationUnit = .days
     var durationValue = 0
     var notes = ""
+    var scannedImageData: Data?
     var packageExpiryDate: Date?
     var packageExpiryEnabled = false
     var dailyCapText = ""
@@ -26,12 +37,11 @@ final class MedicineDraft {
     var refillAtText = "5"
     var dayPreset: String?
     var timePreset: String?
-    var scannedImageData: Data?
 
     let medicine: Medicine?
 
     var times: [Int] {
-        scheduledTimes.map(\.minutes)
+        timeEntries.map(\.minutes).sorted()
     }
 
     var parsedAmount: Decimal? {
@@ -48,8 +58,8 @@ final class MedicineDraft {
     }
 
     var scheduleIsValid: Bool {
-        (daysOfWeek.isEmpty && scheduledTimes.isEmpty)
-            || (!daysOfWeek.isEmpty && !scheduledTimes.isEmpty)
+        (daysOfWeek.isEmpty && times.isEmpty)
+            || (!daysOfWeek.isEmpty && !times.isEmpty)
     }
 
     var durationIsValid: Bool {
@@ -57,7 +67,7 @@ final class MedicineDraft {
     }
 
     var isAsNeeded: Bool {
-        daysOfWeek.isEmpty && scheduledTimes.isEmpty
+        daysOfWeek.isEmpty && times.isEmpty
     }
 
     var contextLine: String {
@@ -73,7 +83,7 @@ final class MedicineDraft {
         amountText = medicine.amount.medicationFormatted
         unit = medicine.unit
         daysOfWeek = Set(medicine.daysOfWeek)
-        scheduledTimes = medicine.times.sorted().map { ScheduledTime(minutes: $0) }
+        replaceTimes(with: medicine.times)
         intervalMinutes = medicine.intervalMinutes
         intervalLinked = medicine.intervalLinked
         remindersOn = medicine.remindersOn
@@ -114,7 +124,7 @@ final class MedicineDraft {
 
     func clearSchedule() {
         daysOfWeek = []
-        scheduledTimes = []
+        timeEntries = []
         intervalMinutes = nil
         intervalLinked = false
         remindersOn = false
@@ -134,11 +144,11 @@ final class MedicineDraft {
 
     func cycleTimePreset() {
         if timePreset == "Every 12h" {
-            scheduledTimes = [0, 480, 960].map { ScheduledTime(minutes: $0) }
+            replaceTimes(with: [0, 480, 960])
             intervalMinutes = 480
             timePreset = "Every 8h"
         } else {
-            scheduledTimes = [0, 720].map { ScheduledTime(minutes: $0) }
+            replaceTimes(with: [0, 720])
             intervalMinutes = 720
             timePreset = "Every 12h"
         }
@@ -146,66 +156,65 @@ final class MedicineDraft {
     }
 
     func addTime() {
-        let proposed = scheduledTimes.last.map { ($0.minutes + 60) % 1_440 } ?? 480
-        guard !scheduledTimes.contains(where: { $0.minutes == proposed }) else {
-            return
-        }
-        scheduledTimes.append(ScheduledTime(minutes: proposed))
-        scheduledTimes.sort { $0.minutes < $1.minutes }
+        let proposed = times.last.map { ($0 + 60) % 1_440 } ?? 480
+        guard !times.contains(proposed) else { return }
+        timeEntries.append(MedicineDraftTime(minutes: proposed))
+        timeEntries.sort { $0.minutes < $1.minutes }
         intervalMinutes = nil
         intervalLinked = false
         timePreset = nil
     }
 
     func removeTime(_ minutes: Int) {
-        scheduledTimes.removeAll { $0.minutes == minutes }
-        intervalMinutes = nil
-        intervalLinked = false
-        timePreset = nil
+        guard let entry = timeEntries.first(where: { $0.minutes == minutes }) else {
+            return
+        }
+        removeTime(id: entry.id)
     }
 
     func removeTime(id: UUID) {
-        scheduledTimes.removeAll { $0.id == id }
+        timeEntries.removeAll { $0.id == id }
         intervalMinutes = nil
         intervalLinked = false
         timePreset = nil
-    }
-
-    @discardableResult
-    func updateTime(id: UUID, to newValue: Int) -> Bool {
-        guard let index = scheduledTimes.firstIndex(where: { $0.id == id }) else {
-            return false
-        }
-        return updateTime(at: index, to: newValue)
     }
 
     @discardableResult
     func updateTime(from oldValue: Int, to newValue: Int) -> Bool {
-        guard let index = scheduledTimes.firstIndex(where: { $0.minutes == oldValue }) else {
+        guard let entry = timeEntries.first(where: { $0.minutes == oldValue }) else {
             return false
         }
-        return updateTime(at: index, to: newValue)
+        return updateTime(id: entry.id, to: newValue)
     }
 
     @discardableResult
-    private func updateTime(at index: Int, to newValue: Int) -> Bool {
-        let oldValue = scheduledTimes[index].minutes
-        if intervalLinked {
-            let delta = newValue - oldValue
-            for offset in scheduledTimes.indices {
-                let shifted = ((scheduledTimes[offset].minutes + delta) % 1_440 + 1_440) % 1_440
-                scheduledTimes[offset].minutes = shifted
-            }
-            scheduledTimes.sort { $0.minutes < $1.minutes }
-            return true
-        }
-
-        guard oldValue == newValue || !scheduledTimes.contains(where: { $0.minutes == newValue }) else {
+    func updateTime(id: UUID, to newValue: Int) -> Bool {
+        guard let index = timeEntries.firstIndex(where: { $0.id == id }) else {
             return false
         }
-        scheduledTimes[index].minutes = newValue
-        scheduledTimes.sort { $0.minutes < $1.minutes }
+        let oldValue = timeEntries[index].minutes
+        if intervalLinked {
+            let delta = newValue - oldValue
+            timeEntries = timeEntries.map { entry in
+                MedicineDraftTime(
+                    id: entry.id,
+                    minutes: ((entry.minutes + delta) % 1_440 + 1_440) % 1_440
+                )
+            }
+            timeEntries.sort { $0.minutes < $1.minutes }
+            return true
+        }
+        guard oldValue == newValue
+                || !timeEntries.contains(where: { $0.id != id && $0.minutes == newValue }) else {
+            return false
+        }
+        timeEntries[index].minutes = newValue
+        timeEntries.sort { $0.minutes < $1.minutes }
         return true
+    }
+
+    func time(for id: UUID) -> Int? {
+        timeEntries.first(where: { $0.id == id })?.minutes
     }
 
     func updateEndDateFromDuration() {
@@ -256,10 +265,7 @@ final class MedicineDraft {
         }
     }
 
-    func save(
-        context: ModelContext,
-        plan: TreatmentPlan? = nil
-    ) throws -> Medicine {
+    func save(context: ModelContext, plan: TreatmentPlan? = nil) throws -> Medicine {
         guard let amount = parsedAmount, amount > 0 else {
             throw MedicineDraftError.invalidAmount
         }
@@ -334,6 +340,12 @@ final class MedicineDraft {
         } else if intervalLinked && intervalMinutes == 720 {
             timePreset = "Every 12h"
         }
+    }
+
+    private func replaceTimes(with values: [Int]) {
+        timeEntries = Array(Set(values))
+            .sorted()
+            .map { MedicineDraftTime(minutes: $0) }
     }
 
     private func updateDayPresetLabel() {
