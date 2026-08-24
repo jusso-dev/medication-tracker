@@ -194,6 +194,8 @@ struct MedicationScanView: View {
             SectionHeading(title: "Detected details")
                 .accessibilityFocused($resultHeadingIsFocused)
 
+            ScanThumbnail(data: result.imageData)
+
             detectedRow("Medicine", value: result.medicineName)
             if let amount = result.amount, let unit = result.unit {
                 detectedRow(
