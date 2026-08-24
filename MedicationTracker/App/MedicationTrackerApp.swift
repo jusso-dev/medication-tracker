@@ -22,7 +22,7 @@ enum MedicationDataStore {
 
 @main
 struct MedicationTrackerApp: App {
-    @Environment(\scenePhase) private var scenePhase
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var router = AppRouter.shared
     @State private var notificationManager = NotificationManager.shared
