@@ -26,8 +26,7 @@ final class MedicineDraft {
     var refillAtText = "5"
     var dayPreset: String?
     var timePreset: String?
-    var scanImageData: Data?
-    var scanImageFileExtension = "jpg"
+    var scannedImageData: Data?
 
     let medicine: Medicine?
 
@@ -82,12 +81,12 @@ final class MedicineDraft {
         endDate = medicine.endDate
         isOngoing = medicine.endDate == nil
         notes = medicine.notes ?? ""
+        scannedImageData = medicine.scannedImageData
         packageExpiryDate = medicine.packageExpiryDate
         packageExpiryEnabled = medicine.packageExpiryDate != nil
         dailyCapText = medicine.dailyCap.map(String.init) ?? ""
         quantityText = medicine.quantityRemaining?.medicationFormatted ?? ""
         refillAtText = medicine.refillAt?.medicationFormatted ?? "5"
-        scanImageData = medicine.scannedImageData
         updatePresetLabels()
 
         if let endDate {
@@ -252,9 +251,8 @@ final class MedicineDraft {
             packageExpiryDate = expiryDate
             packageExpiryEnabled = true
         }
-        if let imageData = result.imageData {
-            scanImageData = imageData
-            scanImageFileExtension = result.imageFileExtension
+        if let scannedImageData = result.scannedImageData {
+            self.scannedImageData = scannedImageData
         }
     }
 
@@ -287,6 +285,7 @@ final class MedicineDraft {
             target.endDate = isOngoing ? nil : endDate?.startOfDay
             target.remindersOn = remindersOn && !isAsNeeded
             target.notes = notes.nilIfBlank
+            target.scannedImageData = scannedImageData
             target.packageExpiryDate = packageExpiryEnabled
                 ? packageExpiryDate?.startOfDay
                 : nil
@@ -310,7 +309,7 @@ final class MedicineDraft {
                 endDate: isOngoing ? nil : endDate,
                 remindersOn: remindersOn && !isAsNeeded,
                 notes: notes,
-                scannedImageData: scanImageData,
+                scannedImageData: scannedImageData,
                 packageExpiryDate: packageExpiryEnabled ? packageExpiryDate : nil,
                 dailyCap: dailyCap,
                 quantityRemaining: quantity,
@@ -318,10 +317,6 @@ final class MedicineDraft {
                 plan: plan
             )
             context.insert(target)
-        }
-
-        if let scanImageData {
-            target.scannedImageData = scanImageData
         }
 
         if let quantity, let refill, quantity > refill {
