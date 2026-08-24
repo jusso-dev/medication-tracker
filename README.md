@@ -38,7 +38,7 @@ After that the app opens on the Medications Catalog. Use `+` to add a medicine o
 - Local notification actions for Take, Skip, and Snooze
 - Optional notes, package expiry, daily cap, quantity remaining, and refill threshold
 - Refill-script review with explicit expiry, authorised/remaining repeats, and refill recording
-- Settings **Backup and restore**: export or import a `.medicationbackup` zip of medicines, plans, doses, refill scripts, and scan photos. Restore is merge-by-id. A file that fails to parse is not applied, so existing data stays
+- Settings **Backup and restore**: export or import a `.medicationbackup` JSON of medicines, plans, doses, refill scripts, and scan photos. Restore replaces the on-device log. The file is validated first. A failed restore rolls back, so a bad file does not leave an empty store
 - One-time, privacy-controlled care snapshots shared through the iOS share sheet (this is not the same as backup)
 - Completion history and medication restart
 - Optional Face ID/device-passcode app lock
@@ -62,7 +62,7 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-The test suite covers schedule/duration calculations, OCR parsing, Australian brand lookup, refill-script status and persistence, daily caps, inventory/refill behaviour, `12.5` / `12,5` amount parsing, backup merge-by-id, Settings scrolling, and end-to-end medicine and treatment-plan flows.
+The test suite covers schedule/duration calculations, OCR parsing, Australian brand lookup, refill-script status and persistence, daily caps, inventory/refill behaviour, `12.5` / `12,5` amount parsing, backup restore, Settings scrolling, and end-to-end medicine and treatment-plan flows.
 
 If you edit `project.yml`, regenerate the project first with:
 
