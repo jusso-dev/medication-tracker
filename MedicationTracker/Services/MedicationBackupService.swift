@@ -139,7 +139,7 @@ enum MedicationBackupCodec {
               Set(backup.treatmentPlans.map(\.id)).count == backup.treatmentPlans.count,
               Set(events.map(\.id)).count == events.count,
               Set(scripts.map(\.id)).count == scripts.count else {
-            throw MedicationBackupError.invalidAdvice
+            throw MedicationBackupError.invalidArchive
         }
 
         let planIDs = Set(backup.treatmentPlans.map(\.id))
