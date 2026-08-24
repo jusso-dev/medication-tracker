@@ -12,12 +12,13 @@ struct SettingsView: View {
 
     @AppStorage(SettingsKeys.reminderLeadTime) private var reminderLeadTime = 0
     @AppStorage(SettingsKeys.snoozeMinutes) private var snoozeMinutes = 10
+    @AppStorage(SettingsKeys.lastBackupAt) private var lastBackupAt = 0.0
     @State private var showingCareShare = false
     @State private var showingBackupExporter = false
     @State private var showingBackupImporter = false
-    @State private var backupDocument = MedicationBackupFile()
-    @State private var backupStatus: String?
-    @State private var backupError: String?
+    @State private var backupDocument: MedicationBackupDocument?
+    @State private var backupIsBusy = false
+    @State private var backupAlert: BackupAlert?
 
     var body: some View {
         ScrollView {
@@ -58,46 +59,45 @@ struct SettingsView: View {
         } message: {
             Text(appLock.errorMessage ?? "")
         }
-        .alert("Backup restored", isPresented: Binding(
-            get: { backupStatus != nil },
-            set: { if !$0 { backupStatus = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(backupStatus ?? "")
-        }
-        .alert("Backup failed", isPresented: Binding(
-            get: { backupError != nil },
-            set: { if !$0 { backupError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(backupError ?? "")
-        }
         .sheet(isPresented: $showingCareShare) {
             CareShareView()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
         }
+        .onChange(of: appLock.isUnlocked) { _, isUnlocked in
+            if !isUnlocked {
+                showingCareShare = false
+            }
+        }
         .fileExporter(
             isPresented: $showingBackupExporter,
             document: backupDocument,
             contentType: .medicationBackup,
-            defaultFilename: "Medication-Tracker-Backup.medicationbackup"
-        ) { result in
-            if case .failure(let error) = result {
-                backupError = error.localizedDescription
-            }
-        }
+            defaultFilename: "Medication-Tracker-Backup.medbackup",
+            onCompletion: backupExportDidComplete
+        )
         .fileImporter(
             isPresented: $showingBackupImporter,
-            allowedContentTypes: [.medicationBackup, .data]
+            allowedContentTypes: [.medicationBackup]
         ) { result in
-            importBackup(result)
+            openBackup(result)
         }
-        .onChange(of: appLock.isUnlocked) { _, isUnlocked in
-            if !isUnlocked {
-                showingCareShare = false
+        .alert(item: $backupAlert) { alert in
+            if let backup = alert.backup {
+                Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message),
+                    primaryButton: .destructive(Text("Restore and replace")) {
+                        restoreBackup(backup)
+                    },
+                    secondaryButton: .cancel()
+                )
+            } else {
+                Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message),
+                    dismissButton: .default(Text("OK"))
+                )
             }
         }
     }
@@ -149,43 +149,6 @@ struct SettingsView: View {
         .medicationCard()
     }
 
-    private var backupSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeading(title: "Backup and restore")
-            Label("Keep a copy of this log", systemImage: "externaldrive")
-                .font(.headline)
-                .foregroundStyle(AppTheme.title)
-            Text("Export every medicine, plan, dose, refill script, and saved scan photo. Import merges by id. A file that cannot be read is left unused.")
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.secondaryText)
-            Button {
-                exportBackup()
-            } label: {
-                Label("Export backup", systemImage: "square.and.arrow.up")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(AppTheme.blue)
-                    .clipShape(.capsule)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("backup.export")
-            Button {
-                showingBackupImporter = true
-            } label: {
-                Label("Import backup", systemImage: "square.and.arrow.down")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.blue)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(AppTheme.blueFill)
-                    .clipShape(.capsule)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("backup.import")
-        }
-        .medicationCard()
-    }
-
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeading(title: "Privacy")
@@ -200,6 +163,73 @@ struct SettingsView: View {
                 .foregroundStyle(AppTheme.secondaryText)
         }
         .medicationCard()
+    }
+
+    private var backupSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeading(title: "Backup and restore")
+            Label("Full local backup", systemImage: "externaldrive.fill")
+                .font(.headline)
+                .foregroundStyle(AppTheme.title)
+            Text("Includes medications, scanned images, schedules, dose history, treatment plans, and refill scripts.")
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.secondaryText)
+            LabeledContent("Last backup", value: lastBackupDescription)
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.text)
+
+            ViewThatFits {
+                HStack(spacing: 10) {
+                    backupButton
+                    restoreButton
+                }
+                VStack(spacing: 10) {
+                    backupButton
+                    restoreButton
+                }
+            }
+
+            Label(
+                "Store backup files somewhere private. Anyone with the file can read its contents.",
+                systemImage: "lock.open.trianglebadge.exclamationmark"
+            )
+            .font(.footnote)
+            .foregroundStyle(AppTheme.secondaryText)
+        }
+        .medicationCard()
+    }
+
+    private var backupButton: some View {
+        Button(action: prepareBackup) {
+            Label(
+                backupIsBusy ? "Preparing…" : "Create backup",
+                systemImage: "square.and.arrow.up"
+            )
+            .font(.headline)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(AppTheme.blue)
+            .clipShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .disabled(backupIsBusy)
+        .accessibilityIdentifier("backup.create")
+    }
+
+    private var restoreButton: some View {
+        Button {
+            showingBackupImporter = true
+        } label: {
+            Label("Restore backup", systemImage: "square.and.arrow.down")
+                .font(.headline)
+                .foregroundStyle(AppTheme.blue)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(AppTheme.blueFill)
+                .clipShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .disabled(backupIsBusy)
+        .accessibilityIdentifier("backup.restore")
     }
 
     private var careShareSection: some View {
@@ -304,38 +334,114 @@ struct SettingsView: View {
         notificationManager.authorizationStatus == .denied ? "bell.slash" : "bell"
     }
 
-    private func exportBackup() {
+    private var lastBackupDescription: String {
+        guard lastBackupAt > 0 else { return "Never" }
+        return Date(timeIntervalSince1970: lastBackupAt).formatted(
+            date: .abbreviated,
+            time: .shortened
+        )
+    }
+
+    private func prepareBackup() {
+        guard !backupIsBusy else { return }
         do {
-            backupDocument = MedicationBackupFile(
-                data: try BackupRestoreService.exportArchive(context: modelContext)
-            )
-            showingBackupExporter = true
+            let backup = try MedicationBackupService.makeBackup(context: modelContext)
+            backupIsBusy = true
+            Task {
+                do {
+                    let data = try await Task.detached(priority: .userInitiated) {
+                        try MedicationBackupCodec.encode(backup)
+                    }.value
+                    backupDocument = MedicationBackupDocument(data: data)
+                    showingBackupExporter = true
+                } catch {
+                    showBackupError(error)
+                }
+                backupIsBusy = false
+            }
         } catch {
-            backupError = error.localizedDescription
+            showBackupError(error)
         }
     }
 
-    private func importBackup(_ result: Result<URL, Error>) {
+    private func backupExportDidComplete(_ result: Result<URL, Error>) {
+        backupDocument = nil
         switch result {
-        case .success(let url):
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer {
-                if accessed {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            }
-            do {
-                let data = try Data(contentsOf: url)
-                try BackupRestoreService.importArchive(data, context: modelContext)
-                Task {
-                    await notificationManager.rebuildAll(context: modelContext)
-                }
-                backupStatus = "Medicines, plans, doses, scripts, and scan photos were merged by id."
-            } catch {
-                backupError = error.localizedDescription
-            }
+        case .success:
+            lastBackupAt = Date.now.timeIntervalSince1970
+            backupAlert = BackupAlert(
+                title: "Backup saved",
+                message: "Your full Medication Tracker backup was exported.",
+                backup: nil
+            )
         case .failure(let error):
-            backupError = error.localizedDescription
+            let cocoaError = error as NSError
+            guard cocoaError.domain != NSCocoaErrorDomain
+                    || cocoaError.code != NSUserCancelledError else {
+                return
+            }
+            showBackupError(error)
         }
     }
+
+    private func openBackup(_ result: Result<URL, Error>) {
+        guard case .success(let url) = result else {
+            if case .failure(let error) = result {
+                showBackupError(error)
+            }
+            return
+        }
+        backupIsBusy = true
+        Task {
+            do {
+                let backup = try await Task.detached(priority: .userInitiated) {
+                    try MedicationBackupCodec.decode(contentsOf: url)
+                }.value
+                let eventCount = backup.medicines.flatMap(\.doseEvents).count
+                backupAlert = BackupAlert(
+                    title: "Restore this backup?",
+                    message: "Created \(backup.createdAt.formatted(date: .abbreviated, time: .shortened)). It contains \(backup.medicines.count) medications, \(backup.treatmentPlans.count) treatment plans, and \(eventCount) dose events. Restoring replaces all current app data.",
+                    backup: backup
+                )
+            } catch {
+                showBackupError(error)
+            }
+            backupIsBusy = false
+        }
+    }
+
+    private func restoreBackup(_ backup: MedicationBackup) {
+        guard !backupIsBusy else { return }
+        backupIsBusy = true
+        Task {
+            do {
+                try MedicationBackupService.restore(backup, context: modelContext)
+                await notificationManager.rebuildAll(context: modelContext)
+                backupAlert = BackupAlert(
+                    title: "Backup restored",
+                    message: "Your medications and history were restored successfully.",
+                    backup: nil
+                )
+            } catch {
+                showBackupError(error)
+            }
+            backupIsBusy = false
+        }
+    }
+
+    private func showBackupError(_ error: Error) {
+        backupAlert = BackupAlert(
+            title: "Backup unavailable",
+            message: (error as? LocalizedError)?.errorDescription
+                ?? "The backup operation could not be completed.",
+            backup: nil
+        )
+    }
+}
+
+private struct BackupAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+    let backup: MedicationBackup?
 }
