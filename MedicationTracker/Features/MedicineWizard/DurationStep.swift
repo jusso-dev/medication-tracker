@@ -16,30 +16,49 @@ struct DurationStep: View {
             VStack(spacing: 18) {
                 dateCards
 
-                MonthRangeCalendar(
-                    displayedMonth: $displayedMonth,
-                    startDate: draft.startDate,
-                    endDate: draft.endDate,
-                    onSelect: selectDate
-                )
-
-                Picker("Duration unit", selection: $draft.durationUnit) {
-                    ForEach(DurationUnit.allCases) { unit in
-                        Text(unit.rawValue).tag(unit)
-                    }
+                Button {
+                    draft.setOngoing()
+                    activeField = .end
+                } label: {
+                    Label("Take indefinitely", systemImage: "infinity")
+                        .font(.headline)
+                        .foregroundStyle(draft.isOngoing ? .white : AppTheme.blue)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(draft.isOngoing ? AppTheme.title : AppTheme.blueFill)
+                        .clipShape(.capsule)
                 }
-                .pickerStyle(.segmented)
-                .onChange(of: draft.durationUnit) {
-                    if let endDate = draft.endDate {
-                        draft.durationValue = ScheduleCalculator.durationValue(
-                            from: draft.startDate,
-                            to: endDate,
-                            unit: draft.durationUnit
-                        )
-                    }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("duration.take-indefinitely")
+                .accessibilityValue(draft.isOngoing ? "Selected" : "")
+
+                if !draft.isOngoing || activeField == .start {
+                    MonthRangeCalendar(
+                        displayedMonth: $displayedMonth,
+                        startDate: draft.startDate,
+                        endDate: draft.endDate,
+                        onSelect: selectDate
+                    )
                 }
 
-                durationStepper
+                if !draft.isOngoing {
+                    Picker("Duration unit", selection: $draft.durationUnit) {
+                        ForEach(DurationUnit.allCases) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: draft.durationUnit) {
+                        if let endDate = draft.endDate {
+                            draft.durationValue = ScheduleCalculator.durationValue(
+                                from: draft.startDate,
+                                to: endDate,
+                                unit: draft.durationUnit
+                            )
+                        }
+                    }
+
+                    durationStepper
+                }
 
                 Text(durationExplanation)
                     .font(.footnote)
@@ -54,11 +73,15 @@ struct DurationStep: View {
         ViewThatFits {
             HStack(spacing: 12) {
                 startCard
-                endCard
+                if !draft.isOngoing {
+                    endCard
+                }
             }
             VStack(spacing: 12) {
                 startCard
-                endCard
+                if !draft.isOngoing {
+                    endCard
+                }
             }
         }
     }
@@ -179,7 +202,7 @@ struct DurationStep: View {
             return "This medication has no planned end date."
         }
         guard let endDate = draft.endDate else {
-            return "Choose an end date or use ∞ for an ongoing medication."
+            return "Choose an end date or tap Take indefinitely."
         }
         return "From \(draft.startDate.shortMedicationDate) to \(endDate.shortMedicationDate). Adding 7 Days ends seven calendar days after the start date."
     }
@@ -209,7 +232,7 @@ struct DurationStep: View {
                     unit: draft.durationUnit
                 )
             }
-            activeField = .end
+            activeField = draft.isOngoing ? .start : .end
         case .end:
             draft.setEndDate(date)
         }
