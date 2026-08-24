@@ -20,26 +20,31 @@ The checked-in Xcode project has one iOS app target, one unit-test target, and o
 
 The app opens on an empty Medications Catalog. Use `+` to add a medicine or treatment plan. Notification permission is requested only when reminders are turned on.
 
+First launch on this branch is meant to show three short pages (add a medicine, scan a label, reminders and backup). Skip goes to the tabs. UI tests that pass `--ui-testing` skip onboarding. The Settings **Backup and restore** card and those pages are the Frontend slice; they are not on the tree yet.
+
 ## Features
 
 - Four-tab interface: History, Today, Medications, and Settings
 - Scheduled and as-needed medication setup
 - Offline Australian medicine-name lookup with common brand names
 - On-device OCR for medicine labels and prescriptions, with camera and photo input
+- The last scanned JPEG or PNG is kept under Application Support, keyed by medicine id, and shown again on the medicine
 - Daily and every-other-day presets, linked 8-hour/12-hour times, and custom times
 - One-tap all-days selection, clear-dose input, and guided schedule validation
-- Finite or ongoing durations
+- Half doses: amounts store as `Decimal`. `12.5` and `12,5` both round-trip; the keypad is meant to type a decimal point so the summary can show 12.5 mg
+- Finite courses, or take indefinitely (`endDate == nil` / `setOngoing()`). There is no second ongoing flag
 - Treatment plans with optional prescriber
 - Take, skip, snooze, take-late, and as-needed dose logging
 - Local notification actions for Take, Skip, and Snooze
 - Optional notes, package expiry, daily cap, quantity remaining, and refill threshold
 - Refill-script review with explicit expiry, authorised/remaining repeats, and refill recording
-- One-time, privacy-controlled care snapshots shared through the iOS share sheet
+- Device backup and restore: a `.medicationbackup` zip of medicines, plans, doses, refill scripts, and scan images. Restore is merge-by-id. A file that fails to parse is not applied, so existing data stays
+- One-time, privacy-controlled care snapshots shared through the iOS share sheet (this is not the same as backup)
 - Completion history and medication restart
 - Optional Face ID/device-passcode app lock
 - Dynamic Type, VoiceOver labels, and 44-point minimum controls
 
-Dose times are stored as wall-clock times. Existing times are not converted when the phone’s time zone changes.
+Dose times are stored as wall-clock times. Existing times are not converted when the phone’s time zone changes. Schedule time rows use a stable id so the hours slider can stay open while you drag.
 
 OCR results and refill-script status must be reviewed against the original label or prescription. Script status is a personal record based on the entered expiry and repeat count; a pharmacist determines whether it can be dispensed. Simulator builds use the photo picker because document-camera capture requires a physical camera.
 
@@ -57,7 +62,7 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-The test suite covers schedule/duration calculations, OCR parsing, Australian brand lookup, refill-script status and persistence, daily caps, inventory/refill behaviour, Settings scrolling, and end-to-end medicine and treatment-plan flows.
+The test suite covers schedule/duration calculations, OCR parsing, Australian brand lookup, refill-script status and persistence, daily caps, inventory/refill behaviour, `12.5` / `12,5` amount parsing, backup merge-by-id, Settings scrolling, and end-to-end medicine and treatment-plan flows.
 
 If you edit `project.yml`, regenerate the project first with:
 
