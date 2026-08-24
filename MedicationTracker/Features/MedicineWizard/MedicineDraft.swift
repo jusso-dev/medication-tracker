@@ -87,6 +87,7 @@ final class MedicineDraft {
         dailyCapText = medicine.dailyCap.map(String.init) ?? ""
         quantityText = medicine.quantityRemaining?.medicationFormatted ?? ""
         refillAtText = medicine.refillAt?.medicationFormatted ?? "5"
+        scanImageData = medicine.scannedImageData
         updatePresetLabels()
 
         if let endDate {
@@ -259,8 +260,7 @@ final class MedicineDraft {
 
     func save(
         context: ModelContext,
-        plan: TreatmentPlan? = nil,
-        scanImageStore: ScanImageStore = .shared
+        plan: TreatmentPlan? = nil
     ) throws -> Medicine {
         guard let amount = parsedAmount, amount > 0 else {
             throw MedicineDraftError.invalidAmount
@@ -310,6 +310,7 @@ final class MedicineDraft {
                 endDate: isOngoing ? nil : endDate,
                 remindersOn: remindersOn && !isAsNeeded,
                 notes: notes,
+                scannedImageData: scanImageData,
                 packageExpiryDate: packageExpiryEnabled ? packageExpiryDate : nil,
                 dailyCap: dailyCap,
                 quantityRemaining: quantity,
@@ -320,11 +321,7 @@ final class MedicineDraft {
         }
 
         if let scanImageData {
-            target.scanImageFileName = try scanImageStore.write(
-                scanImageData,
-                medicineID: target.id,
-                fileExtension: scanImageFileExtension
-            )
+            target.scannedImageData = scanImageData
         }
 
         if let quantity, let refill, quantity > refill {
