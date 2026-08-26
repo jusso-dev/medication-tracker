@@ -33,12 +33,11 @@ struct MedicationTrackerApp: App {
 
     private let modelContainer: ModelContainer
     private let storeError: String?
-    private let skipOnboarding: Bool
 
     init() {
+        let arguments = ProcessInfo.processInfo.arguments
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-            || ProcessInfo.processInfo.arguments.contains("--ui-testing")
-        skipOnboarding = isTesting
+            || arguments.contains("--ui-testing")
         var launchError: String?
         let resolvedContainer: ModelContainer
 
@@ -68,7 +67,27 @@ struct MedicationTrackerApp: App {
         modelContainer = resolvedContainer
         storeError = launchError
 
-        if isTesting && ProcessInfo.processInfo.arguments.contains("--ui-testing-seed") {
+        if isTesting {
+            UserDefaults.standard.set(
+                !arguments.contains("--ui-testing-onboarding"),
+                forKey: SettingsKeys.hasCompletedOnboarding
+            )
+        } else if launchError == nil,
+                  UserDefaults.standard.object(
+                    forKey: SettingsKeys.hasCompletedOnboarding
+                  ) == nil {
+            let hasExistingData = ((try? resolvedContainer.mainContext.fetchCount(
+                FetchDescriptor<Medicine>()
+            )) ?? 0) > 0 || ((try? resolvedContainer.mainContext.fetchCount(
+                FetchDescriptor<TreatmentPlan>()
+            )) ?? 0) > 0
+            UserDefaults.standard.set(
+                hasExistingData,
+                forKey: SettingsKeys.hasCompletedOnboarding
+            )
+        }
+
+        if isTesting && arguments.contains("--ui-testing-seed") {
             try? UITestSeeder.seed(context: modelContainer.mainContext)
         }
         if isTesting && ProcessInfo.processInfo.arguments.contains("--ui-testing-import") {
@@ -87,19 +106,26 @@ struct MedicationTrackerApp: App {
         WindowGroup {
             ZStack {
                 if storeError == nil {
-                    if hasCompletedOnboarding || skipOnboarding {
+                    if hasCompletedOnboarding {
                         MainTabView()
                             .environment(router)
                             .environment(notificationManager)
                             .environment(appLock)
                     } else {
-                        OnboardingView()
+                        OnboardingView {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                hasCompletedOnboarding = true
+                            }
+                        }
                     }
                 } else {
                     DataStoreErrorView()
                 }
 
-                if storeError == nil && appLock.isEnabled && !appLock.isUnlocked {
+                if storeError == nil
+                    && hasCompletedOnboarding
+                    && appLock.isEnabled
+                    && !appLock.isUnlocked {
                     LockScreenView()
                         .environment(appLock)
                         .transition(.opacity)
