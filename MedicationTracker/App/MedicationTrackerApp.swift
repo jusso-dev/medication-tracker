@@ -169,7 +169,7 @@ struct MedicationTrackerApp: App {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.hidden)
             }
-            .alert("Could not open care snapshot", isPresented: Binding(
+            .alert("Couldn’t open care snapshot", isPresented: Binding(
                 get: { careShareImportRouter.errorMessage != nil },
                 set: { if !$0 { careShareImportRouter.errorMessage = nil } }
             )) {
