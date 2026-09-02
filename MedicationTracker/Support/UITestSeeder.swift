@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UIKit
 
 @MainActor
 enum UITestSeeder {
@@ -33,6 +34,9 @@ enum UITestSeeder {
             packageExpiryDate: packageExpiry,
             plan: plan
         )
+        amoxicillin.scannedImageData = UIImage(systemName: "pill.fill")?
+            .withTintColor(.systemBlue)
+            .pngData()
         let script = RefillScript(
             medicine: amoxicillin,
             scriptNumber: "RX-TEST",

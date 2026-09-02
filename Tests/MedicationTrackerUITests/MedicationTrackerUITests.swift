@@ -144,7 +144,7 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["500 mg"].exists)
         app.staticTexts["Amoxicillin"].tap()
         XCTAssertTrue(app.staticTexts["Medication image"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.images["medication.image"].exists)
+        XCTAssertTrue(app.buttons["medication.image.open"].exists)
         XCTAssertTrue(app.buttons["medication.image.replace"].exists)
         let removeImage = app.buttons["medication.image.remove"]
         XCTAssertTrue(removeImage.exists)
@@ -208,6 +208,41 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["12.5 mg"].exists)
     }
 
+    func testMedicationImageOpensFullScreenZoomsAndSavesToPhotos() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing",
+            "--ui-testing-seed",
+            "--ui-testing-photo-save"
+        ]
+        app.launch()
+
+        app.staticTexts["Amoxicillin"].tap()
+        let openImage = app.buttons["medication.image.open"]
+        XCTAssertTrue(openImage.waitForExistence(timeout: 3))
+        openImage.tap()
+
+        let fullScreenImage = app.images["medication.image.fullscreen"]
+        XCTAssertTrue(fullScreenImage.waitForExistence(timeout: 3))
+        XCTAssertEqual(fullScreenImage.value as? String, "100 percent zoom")
+
+        let zoomOut = app.buttons["medication.image.zoom.out"]
+        XCTAssertFalse(zoomOut.isEnabled)
+        app.buttons["medication.image.zoom.in"].tap()
+        XCTAssertTrue(zoomOut.isEnabled)
+        XCTAssertEqual(fullScreenImage.value as? String, "150 percent zoom")
+        app.buttons["medication.image.zoom.reset"].tap()
+        XCTAssertFalse(zoomOut.isEnabled)
+
+        app.buttons["medication.image.save"].tap()
+        XCTAssertTrue(
+            app.staticTexts["medication.image.save.status"].waitForExistence(timeout: 3)
+        )
+
+        app.buttons["medication.image.viewer.close"].tap()
+        XCTAssertTrue(app.staticTexts["Medication image"].waitForExistence(timeout: 3))
+    }
+
     func testNewUserCompletesCleanOnboarding() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--ui-testing-onboarding"]
@@ -237,7 +272,7 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Weekly schedule"].exists)
         XCTAssertTrue(app.staticTexts["Package expiry"].exists)
         XCTAssertTrue(app.staticTexts["Refill Scripts"].exists)
-        XCTAssertTrue(app.buttons["medication.image.add"].exists)
+        XCTAssertTrue(app.buttons["medication.image.open"].exists)
 
         app.buttons["refill.script.RX-TEST"].tap()
         XCTAssertTrue(app.staticTexts["Refill Script"].waitForExistence(timeout: 3))
@@ -260,6 +295,7 @@ final class MedicationTrackerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Past medications"].waitForExistence(timeout: 3))
         app.staticTexts["Paracetamol"].tap()
         XCTAssertTrue(app.staticTexts["Medication"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["medication.image.add"].exists)
         let restart = app.buttons["Restart"]
         for _ in 0..<4 where !restart.isHittable {
             app.swipeUp()

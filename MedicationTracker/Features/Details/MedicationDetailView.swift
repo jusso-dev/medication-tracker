@@ -1,3 +1,4 @@
+import Photos
 import PhotosUI
 import SwiftData
 import SwiftUI
@@ -19,6 +20,7 @@ struct MedicationDetailView: View {
     @State private var selectedImage: PhotosPickerItem?
     @State private var isSavingImage = false
     @State private var imageErrorMessage: String?
+    @State private var showingImageViewer = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -82,6 +84,12 @@ struct MedicationDetailView: View {
             RefillScriptReviewView(script: script, allowsEditing: !isReadOnly)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
+        }
+        .fullScreenCover(isPresented: $showingImageViewer) {
+            if let imageData = medicine.scannedImageData,
+               let image = UIImage(data: imageData) {
+                MedicationImageViewer(image: image, imageData: imageData)
+            }
         }
         .onChange(of: selectedImage) { _, item in
             guard let item else { return }
@@ -189,7 +197,7 @@ struct MedicationDetailView: View {
         if let imageData = medicine.scannedImageData,
            let image = UIImage(data: imageData) {
             medicationImageCard(image)
-        } else if !isReadOnly {
+        } else {
             DetailLabelRow("Medication image", symbol: "photo") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Add a photo of the medication or its packaging for future reference.")
@@ -205,30 +213,35 @@ struct MedicationDetailView: View {
     private func medicationImageCard(_ image: UIImage) -> some View {
         DetailLabelRow("Medication image", symbol: "photo") {
             VStack(alignment: .leading, spacing: 12) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 260)
-                    .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
-                    .accessibilityLabel("Medication image")
-                    .accessibilityIdentifier("medication.image")
-                Text("Saved on this device with the medication record.")
+                Button {
+                    showingImageViewer = true
+                } label: {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 260)
+                        .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
+                        .accessibilityIdentifier("medication.image")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View medication image full screen")
+                .accessibilityHint("Opens zoom and save controls")
+                .accessibilityIdentifier("medication.image.open")
+                Text("Tap to view full screen, zoom, or save to Photos.")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryText)
 
-                if !isReadOnly {
-                    ViewThatFits {
-                        HStack(spacing: 10) {
-                            replaceImagePicker
-                            removeImageButton
-                        }
-                        VStack(spacing: 10) {
-                            replaceImagePicker
-                            removeImageButton
-                        }
+                ViewThatFits {
+                    HStack(spacing: 10) {
+                        replaceImagePicker
+                        removeImageButton
                     }
-                    imageSavingIndicator
+                    VStack(spacing: 10) {
+                        replaceImagePicker
+                        removeImageButton
+                    }
                 }
+                imageSavingIndicator
             }
         }
     }
@@ -478,4 +491,323 @@ private enum MedicationDetailAction: String, Identifiable {
     case removeImage
 
     var id: String { rawValue }
+}
+
+private struct MedicationImageViewer: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+
+    let image: UIImage
+    let imageData: Data
+
+    @State private var scale = 1.0
+    @State private var offset = CGSize.zero
+    @State private var isSaving = false
+    @State private var didSave = false
+    @State private var saveError: MedicationPhotoSaveError?
+    @GestureState private var gestureScale = 1.0
+    @GestureState private var dragOffset = CGSize.zero
+
+    private let minimumScale = 1.0
+    private let maximumScale = 5.0
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                imageView(in: proxy.size)
+
+                VStack(spacing: 16) {
+                    topBar
+                    Spacer()
+                    zoomControls(in: proxy.size)
+                }
+                .padding(16)
+            }
+            .alert(item: $saveError) { error in
+                if error == .accessDenied {
+                    return Alert(
+                        title: Text("Photos access needed"),
+                        message: Text(error.localizedDescription),
+                        primaryButton: .default(Text("Open Settings"), action: openSettings),
+                        secondaryButton: .cancel()
+                    )
+                }
+                return Alert(
+                    title: Text("Photo could not be saved"),
+                    message: Text(error.localizedDescription),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+        }
+    }
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            Button(action: dismiss.callAsFunction) {
+                Label("Close", systemImage: "xmark")
+            }
+            .accessibilityIdentifier("medication.image.viewer.close")
+
+            Spacer()
+
+            if didSave {
+                Label("Saved to Photos", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .accessibilityIdentifier("medication.image.save.status")
+            } else {
+                Button {
+                    saveToPhotos()
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Label("Save to Photos", systemImage: "square.and.arrow.down")
+                    }
+                }
+                .disabled(isSaving)
+                .accessibilityIdentifier("medication.image.save")
+            }
+        }
+        .font(.headline)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .frame(minHeight: 52)
+        .background(.ultraThinMaterial, in: .capsule)
+    }
+
+    private func imageView(in viewport: CGSize) -> some View {
+        let visibleScale = clampedScale(scale * gestureScale)
+        let visibleOffset = clampedOffset(
+            CGSize(
+                width: offset.width + dragOffset.width,
+                height: offset.height + dragOffset.height
+            ),
+            in: viewport,
+            at: visibleScale
+        )
+
+        return Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .frame(width: viewport.width, height: viewport.height)
+            .scaleEffect(visibleScale)
+            .offset(visibleOffset)
+            .contentShape(.rect)
+            .gesture(magnifyGesture(in: viewport))
+            .simultaneousGesture(panGesture(in: viewport))
+            .onTapGesture(count: 2) {
+                if scale > minimumScale {
+                    resetZoom()
+                } else {
+                    setScale(2, in: viewport)
+                }
+            }
+            .accessibilityLabel("Medication image, full screen")
+            .accessibilityValue("\(Int(visibleScale * 100)) percent zoom")
+            .accessibilityZoomAction { action in
+                switch action.direction {
+                case .zoomIn:
+                    adjustScale(by: 0.5, in: viewport)
+                case .zoomOut:
+                    adjustScale(by: -0.5, in: viewport)
+                }
+            }
+            .accessibilityIdentifier("medication.image.fullscreen")
+    }
+
+    private func zoomControls(in viewport: CGSize) -> some View {
+        VStack(spacing: 10) {
+            Text("Pinch to zoom. Drag when zoomed. Double-tap to reset.")
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.8))
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 18) {
+                Button {
+                    adjustScale(by: -0.5, in: viewport)
+                } label: {
+                    Label("Zoom out", systemImage: "minus.magnifyingglass")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(scale <= minimumScale)
+                .accessibilityLabel("Zoom out")
+                .accessibilityIdentifier("medication.image.zoom.out")
+
+                Button {
+                    resetZoom()
+                } label: {
+                    Text("\(Int(scale * 100))%")
+                        .monospacedDigit()
+                        .frame(minWidth: 54)
+                }
+                .disabled(scale == minimumScale && offset == .zero)
+                .accessibilityLabel("Reset zoom")
+                .accessibilityValue("\(Int(scale * 100)) percent")
+                .accessibilityIdentifier("medication.image.zoom.reset")
+
+                Button {
+                    adjustScale(by: 0.5, in: viewport)
+                } label: {
+                    Label("Zoom in", systemImage: "plus.magnifyingglass")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(scale >= maximumScale)
+                .accessibilityLabel("Zoom in")
+                .accessibilityIdentifier("medication.image.zoom.in")
+            }
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .frame(minHeight: 52)
+            .background(.ultraThinMaterial, in: .capsule)
+        }
+    }
+
+    private func magnifyGesture(in viewport: CGSize) -> some Gesture {
+        MagnifyGesture(minimumScaleDelta: 0.01)
+            .updating($gestureScale) { value, state, _ in
+                state = value.magnification
+            }
+            .onEnded { value in
+                setScale(scale * value.magnification, in: viewport)
+            }
+    }
+
+    private func panGesture(in viewport: CGSize) -> some Gesture {
+        DragGesture()
+            .updating($dragOffset) { value, state, _ in
+                guard scale > minimumScale else { return }
+                state = value.translation
+            }
+            .onEnded { value in
+                guard scale > minimumScale else { return }
+                offset = clampedOffset(
+                    CGSize(
+                        width: offset.width + value.translation.width,
+                        height: offset.height + value.translation.height
+                    ),
+                    in: viewport,
+                    at: scale
+                )
+            }
+    }
+
+    private func adjustScale(by change: Double, in viewport: CGSize) {
+        setScale(scale + change, in: viewport)
+    }
+
+    private func setScale(_ proposedScale: Double, in viewport: CGSize) {
+        let newScale = clampedScale(proposedScale)
+        withAnimation(.spring(duration: 0.25)) {
+            scale = newScale
+            offset = newScale == minimumScale
+                ? .zero
+                : clampedOffset(offset, in: viewport, at: newScale)
+        }
+    }
+
+    private func resetZoom() {
+        withAnimation(.spring(duration: 0.25)) {
+            scale = minimumScale
+            offset = .zero
+        }
+    }
+
+    private func clampedScale(_ value: Double) -> Double {
+        min(max(value, minimumScale), maximumScale)
+    }
+
+    private func clampedOffset(
+        _ proposedOffset: CGSize,
+        in viewport: CGSize,
+        at scale: Double
+    ) -> CGSize {
+        guard scale > minimumScale else { return .zero }
+        let fittedSize = fittedImageSize(in: viewport)
+        let maximumX = max(0, (fittedSize.width * scale - viewport.width) / 2)
+        let maximumY = max(0, (fittedSize.height * scale - viewport.height) / 2)
+        return CGSize(
+            width: min(max(proposedOffset.width, -maximumX), maximumX),
+            height: min(max(proposedOffset.height, -maximumY), maximumY)
+        )
+    }
+
+    private func fittedImageSize(in viewport: CGSize) -> CGSize {
+        guard image.size.width > 0, image.size.height > 0 else { return viewport }
+        let ratio = min(
+            viewport.width / image.size.width,
+            viewport.height / image.size.height
+        )
+        return CGSize(width: image.size.width * ratio, height: image.size.height * ratio)
+    }
+
+    private func saveToPhotos() {
+        isSaving = true
+        Task {
+            do {
+                try await MedicationPhotoLibrary.save(imageData)
+                didSave = true
+            } catch let error as MedicationPhotoSaveError {
+                saveError = error
+            } catch {
+                saveError = .saveFailed
+            }
+            isSaving = false
+        }
+    }
+
+    private func openSettings() {
+        guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
+        openURL(settingsURL)
+    }
+}
+
+private enum MedicationPhotoLibrary {
+    static func save(_ imageData: Data) async throws {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing-photo-save") {
+            return
+        }
+        #endif
+
+        let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        let status = currentStatus == .notDetermined
+            ? await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            : currentStatus
+        guard status == .authorized || status == .limited else {
+            throw MedicationPhotoSaveError.accessDenied
+        }
+
+        try await withCheckedThrowingContinuation { continuation in
+            PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: .photo, data: imageData, options: nil)
+            } completionHandler: { success, error in
+                if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: error ?? MedicationPhotoSaveError.saveFailed)
+                }
+            }
+        }
+    }
+}
+
+private enum MedicationPhotoSaveError: String, Error, Identifiable, LocalizedError {
+    case accessDenied
+    case saveFailed
+
+    var id: String { rawValue }
+
+    var errorDescription: String? {
+        switch self {
+        case .accessDenied:
+            "Allow Photos access in Settings to save this medication image."
+        case .saveFailed:
+            "The medication image could not be saved to Photos. Try again."
+        }
+    }
 }
