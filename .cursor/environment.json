@@ -1,0 +1,4 @@
+{
+  "name": "Medication Tracker",
+  "install": "bash .cursor/install.sh"
+}
