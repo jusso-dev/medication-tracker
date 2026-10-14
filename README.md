@@ -18,27 +18,30 @@ The checked-in Xcode project has one iOS app target, one unit-test target, and o
 3. Select the `MedicationTracker` scheme and an iPhone simulator.
 4. Press **Run** (`⌘R`).
 
-New users see a short onboarding flow before the empty Medications Catalog. Use `+` to add a medicine or treatment plan. Notification permission is requested only when reminders are turned on.
+First launch shows three short pages: add a medicine, scan a label, then reminders and backup. Skip goes to the tabs. UI tests that pass `--ui-testing` skip onboarding.
+
+After that the app opens on the Medications Catalog. Use `+` to add a medicine or treatment plan. Notification permission is requested only when reminders are turned on.
 
 ## Features
 
 - Four-tab interface: History, Today, Medications, and Settings
 - Scheduled and as-needed medication setup
 - Offline Australian medicine-name lookup with common brand names
-- On-device OCR for medicine labels and prescriptions, with camera and photo input and an optional saved label image
-- Daily and every-other-day presets, linked 8-hour/12-hour times, and always-visible custom time sliders
+- On-device OCR for medicine labels and prescriptions, with camera and photo input
+- The last scanned JPEG or PNG is stored on the medicine record (`scannedImageData`) and shown on the scan result card and the medicine detail screen
+- Daily and every-other-day presets, linked 8-hour/12-hour times, and custom times with a slider that stays open while you drag
 - One-tap all-days selection, clear-dose input, and guided schedule validation
-- Whole, fractional, and decimal strengths such as 12.5 mg
-- Finite or explicitly indefinite durations
+- Half doses: amounts store as `Decimal`. `12.5` and `12,5` both round-trip. The keypad has a decimal point and the amount summary shows 12.5 mg
+- Finite courses, or Take indefinitely (`endDate == nil` / `setOngoing()`), which hides the end date. There is no second ongoing flag
 - Treatment plans with optional prescriber
 - Take, skip, snooze, take-late, and as-needed dose logging
 - Local notification actions for Take, Skip, and Snooze
 - Optional notes, package expiry, daily cap, quantity remaining, and refill threshold
 - Refill-script review with explicit expiry, authorised/remaining repeats, and refill recording
-- One-time, privacy-controlled care snapshots shared through the iOS share sheet
+- Settings **Backup and restore**: export or import a `.medicationbackup` JSON of medicines, plans, doses, refill scripts, and scan photos. Restore replaces the on-device log. The file is validated first. A failed restore rolls back, so a bad file does not leave an empty store
+- One-time, privacy-controlled care snapshots shared through the iOS share sheet (this is not the same as backup)
 - Completion history and medication restart
 - Optional Face ID/device-passcode app lock
-- Full local backup and confirmed restore for medicines, images, plans, scripts, and dose history
 - Dynamic Type, VoiceOver labels, and 44-point minimum controls
 
 Dose times are stored as wall-clock times. Existing times are not converted when the phone’s time zone changes.
@@ -59,7 +62,7 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-The test suite covers schedule/duration calculations, OCR parsing and scan-image persistence, Australian brand lookup, full backup/restore, refill-script status and persistence, decimal doses, daily caps, inventory/refill behaviour, onboarding, Settings scrolling, and end-to-end medicine and treatment-plan flows.
+The test suite covers schedule/duration calculations, OCR parsing and scan-image persistence, Australian brand lookup, backup restore, refill-script status and persistence, `12.5` / `12,5` amounts, daily caps, inventory/refill behaviour, onboarding, Settings scrolling, and end-to-end medicine and treatment-plan flows.
 
 If you edit `project.yml`, regenerate the project first with:
 
