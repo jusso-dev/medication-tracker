@@ -525,6 +525,9 @@ private struct MedicationImageViewer: View {
                 }
                 .padding(16)
             }
+            .onChange(of: proxy.size) { _, size in
+                offset = clampedOffset(offset, in: size, at: scale)
+            }
             .alert(item: $saveError) { error in
                 if error == .accessDenied {
                     return Alert(

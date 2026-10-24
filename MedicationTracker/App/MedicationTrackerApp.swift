@@ -203,6 +203,15 @@ struct MedicationTrackerApp: App {
 
 private struct DataStoreErrorView: View {
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView { content }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.background)
+    }
+
+    private var content: some View {
         VStack(spacing: 18) {
             CircularSymbol(
                 name: "externaldrive.badge.exclamationmark",
@@ -220,8 +229,7 @@ private struct DataStoreErrorView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppTheme.background)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -229,6 +237,16 @@ private struct LockScreenView: View {
     @Environment(AppLockService.self) private var appLock
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView { content }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.background)
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private var content: some View {
         VStack(spacing: 20) {
             CircularSymbol(name: "lock.shield", size: 72)
             Text("Medication Tracker is locked")
@@ -249,8 +267,6 @@ private struct LockScreenView: View {
             .clipShape(.capsule)
         }
         .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppTheme.background)
-        .accessibilityAddTraits(.isModal)
+        .frame(maxWidth: .infinity)
     }
 }

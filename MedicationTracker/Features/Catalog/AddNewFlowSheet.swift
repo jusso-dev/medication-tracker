@@ -41,28 +41,29 @@ struct AddNewFlowSheet: View {
                     dismiss()
                 }
             }
+            .padding([.horizontal, .top], 20)
 
-            VStack(spacing: 16) {
-                chooserCard(
-                    symbol: "pill",
-                    title: "Medicine",
-                    subtitle: "Track daily, temporary, or as-needed medicines."
-                ) {
-                    choice = .medicine
-                }
+            ScrollView {
+                VStack(spacing: 16) {
+                    chooserCard(
+                        symbol: "pill",
+                        title: "Medicine",
+                        subtitle: "Track daily, temporary, or as-needed medicines."
+                    ) {
+                        choice = .medicine
+                    }
 
-                chooserCard(
-                    symbol: "heart.text.clipboard",
-                    title: "Treatment Plan",
-                    subtitle: "Group medicines by condition, doctor, or goal."
-                ) {
-                    choice = .treatmentPlan
+                    chooserCard(
+                        symbol: "heart.text.clipboard",
+                        title: "Treatment Plan",
+                        subtitle: "Group medicines by condition, doctor, or goal."
+                    ) {
+                        choice = .treatmentPlan
+                    }
                 }
+                .padding([.horizontal, .bottom], 20)
             }
-
-            Spacer()
         }
-        .padding(20)
     }
 
     private func chooserCard(
