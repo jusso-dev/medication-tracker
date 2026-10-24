@@ -6,8 +6,9 @@ struct MonthRangeCalendar: View {
     let endDate: Date?
     let onSelect: (Date) -> Void
 
+    @ScaledMetric(relativeTo: .subheadline) private var cellSize: CGFloat = 44
+
     private let calendar = Calendar.current
-    private let columns = Array(repeating: GridItem(.fixed(44), spacing: 0), count: 7)
     private let weekdaySymbols = ["S", "M", "T", "W", "T", "F", "S"]
 
     var body: some View {
@@ -39,32 +40,42 @@ struct MonthRangeCalendar: View {
                 .accessibilityLabel("Next month")
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyVGrid(columns: columns, spacing: 0) {
-                    ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
-                        Text(symbol)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppTheme.secondaryText)
-                            .frame(width: 44, height: 44)
-                            .accessibilityHidden(true)
-                    }
-
-                    ForEach(gridDays) { gridDay in
-                        switch gridDay.value {
-                        case .placeholder:
-                            Color.clear.frame(width: 44, height: 44)
-                        case .date(let date):
-                            dayButton(date)
-                        }
-                    }
+            ViewThatFits(in: .horizontal) {
+                dayGrid
+                ScrollView(.horizontal, showsIndicators: false) {
+                    dayGrid
                 }
-                .frame(width: 308)
             }
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 16)
         .background(AppTheme.surface)
         .clipShape(.rect(cornerRadius: AppTheme.cardRadius))
+    }
+
+    private var dayGrid: some View {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.fixed(cellSize), spacing: 0), count: 7),
+            spacing: 0
+        ) {
+            ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+                Text(symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .frame(width: cellSize, height: cellSize)
+                    .accessibilityHidden(true)
+            }
+
+            ForEach(gridDays) { gridDay in
+                switch gridDay.value {
+                case .placeholder:
+                    Color.clear.frame(width: cellSize, height: cellSize)
+                case .date(let date):
+                    dayButton(date)
+                }
+            }
+        }
+        .frame(width: cellSize * 7)
     }
 
     private var gridDays: [CalendarGridDay] {
@@ -106,7 +117,7 @@ struct MonthRangeCalendar: View {
             Text(date.formatted(.dateTime.day()))
                 .font(.subheadline.weight(isStart || isEnd ? .bold : .regular))
                 .foregroundStyle(isStart || isEnd ? .white : AppTheme.text)
-                .frame(width: 44, height: 44)
+                .frame(width: cellSize, height: cellSize)
                 .background(
                     isStart || isEnd
                         ? AppTheme.blue

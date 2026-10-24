@@ -80,25 +80,27 @@ struct TreatmentPlanWizardView: View {
     }
 
     private var planNameStep: some View {
-        VStack {
-            Spacer(minLength: 40)
-            TextField("e.g. Gastritis", text: $draft.title)
-                .font(.largeTitle.weight(.semibold))
-                .foregroundStyle(AppTheme.title)
-                .multilineTextAlignment(.center)
-                .textInputAutocapitalization(.words)
-                .padding(.horizontal, 18)
-                .frame(minHeight: 72)
-                .background(AppTheme.surface)
-                .clipShape(.rect(cornerRadius: AppTheme.cardRadius))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppTheme.cardRadius)
-                        .stroke(AppTheme.blueFillStrong, lineWidth: 2)
-                }
-                .accessibilityIdentifier("plan.title")
-            Spacer()
+        ScrollView {
+            VStack {
+                Spacer(minLength: 40)
+                TextField("e.g. Gastritis", text: $draft.title)
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(AppTheme.title)
+                    .multilineTextAlignment(.center)
+                    .textInputAutocapitalization(.words)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 72)
+                    .background(AppTheme.surface)
+                    .clipShape(.rect(cornerRadius: AppTheme.cardRadius))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppTheme.cardRadius)
+                            .stroke(AppTheme.blueFillStrong, lineWidth: 2)
+                    }
+                    .accessibilityIdentifier("plan.title")
+            }
+            .padding(20)
         }
-        .padding(20)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private var medicineSelectionStep: some View {
@@ -202,31 +204,33 @@ struct TreatmentPlanWizardView: View {
     }
 
     private var prescriberStep: some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 40)
-            Text(draft.title)
-                .font(.title.bold())
-                .foregroundStyle(AppTheme.title)
-            TextField("Self-managed", text: $draft.prescriber)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(AppTheme.title)
-                .multilineTextAlignment(.center)
-                .textInputAutocapitalization(.words)
-                .padding(.horizontal, 18)
-                .frame(minHeight: 70)
-                .background(AppTheme.surface)
-                .clipShape(.rect(cornerRadius: AppTheme.cardRadius))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppTheme.cardRadius)
-                        .stroke(AppTheme.blueFillStrong, lineWidth: 2)
-                }
-                .accessibilityIdentifier("plan.prescriber")
-            Text("Leave blank to use Self-managed.")
-                .font(.footnote)
-                .foregroundStyle(AppTheme.secondaryText)
-            Spacer()
+        ScrollView {
+            VStack(spacing: 22) {
+                Spacer(minLength: 40)
+                Text(draft.title)
+                    .font(.title.bold())
+                    .foregroundStyle(AppTheme.title)
+                TextField("Self-managed", text: $draft.prescriber)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(AppTheme.title)
+                    .multilineTextAlignment(.center)
+                    .textInputAutocapitalization(.words)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 70)
+                    .background(AppTheme.surface)
+                    .clipShape(.rect(cornerRadius: AppTheme.cardRadius))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppTheme.cardRadius)
+                            .stroke(AppTheme.blueFillStrong, lineWidth: 2)
+                    }
+                    .accessibilityIdentifier("plan.prescriber")
+                Text("Leave blank to use Self-managed.")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryText)
+            }
+            .padding(20)
         }
-        .padding(20)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private var availableMedicines: [Medicine] {

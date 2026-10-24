@@ -87,6 +87,7 @@ struct DurationStep: View {
         }
         .buttonStyle(.plain)
         .accessibilityValue(draft.startDate.longMedicationDate)
+        .accessibilityAddTraits(activeField == .start ? .isSelected : [])
     }
 
     @ViewBuilder
@@ -121,6 +122,7 @@ struct DurationStep: View {
                 .clipShape(.rect(cornerRadius: AppTheme.controlRadius))
             }
             .buttonStyle(.plain)
+            .accessibilityAddTraits(activeField == .end ? .isSelected : [])
         }
     }
 

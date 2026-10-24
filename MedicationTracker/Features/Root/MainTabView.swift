@@ -60,7 +60,9 @@ private struct FloatingTabBar: View {
             Capsule().stroke(AppTheme.divider, lineWidth: 1)
         }
         .shadow(color: AppTheme.title.opacity(0.10), radius: 14, y: 6)
+        .frame(maxWidth: 420)
         .padding(.horizontal, 28)
+        .frame(maxWidth: .infinity)
         .padding(.top, 8)
         .padding(.bottom, 6)
         .background(AppTheme.background)
